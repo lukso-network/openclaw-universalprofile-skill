@@ -238,3 +238,29 @@ export function generateAuthUrl(
   if (chainId) params.set('chain', chainId.toString())
   return `${baseUrl}?${params.toString()}`
 }
+
+/**
+ * Convert IPFS URL to HTTP gateway URL
+ * Handles ipfs://, ipfs://ipfs/, and raw CIDs
+ */
+export function convertIpfsUrl(url: string): string {
+  if (!url) return url
+  
+  // Already an HTTP URL
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  
+  // IPFS protocol URLs
+  if (url.startsWith('ipfs://')) {
+    const hash = url.replace('ipfs://', '').replace('ipfs/', '')
+    return `https://api.universalprofile.cloud/ipfs/${hash}`
+  }
+  
+  // Raw IPFS hash (starts with Qm or baf)
+  if (url.startsWith('Qm') || url.startsWith('baf')) {
+    return `https://api.universalprofile.cloud/ipfs/${url}`
+  }
+  
+  return url
+}

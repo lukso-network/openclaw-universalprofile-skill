@@ -11,6 +11,7 @@ import {
   type Chain
 } from 'viem'
 import { CHAINS, LSP0_ABI, DATA_KEYS } from '../constants'
+import { convertIpfsUrl } from '../utils'
 
 // Type for UP Provider
 interface UPProvider {
@@ -192,11 +193,45 @@ export function useWallet() {
       let profileDescription: string | undefined
       let profileImage: string | undefined
 
-      // Parse LSP3 profile data if available (simplified - real implementation would decode IPFS hash)
-      if (profileData && profileData !== '0x') {
-        // LSP3 data is typically a hash of IPFS JSON
-        // For now, we'll leave this as undefined
-        // Full implementation would fetch from IPFS and parse
+      // Parse LSP3 profile data if available
+      if (profileData && profileData !== '0x' && profileData.length > 10) {
+        try {
+          // LSP3 data format: bytes4 hashFunction + bytes4 dataLength + bytes dataContent
+          // Skip first 6 bytes (0x + 4 bytes hash function) and get the URL
+          const dataWithoutPrefix = profileData.slice(10)
+          // Convert hex to string to get IPFS URL
+          const urlBytes = dataWithoutPrefix.match(/.{1,2}/g)
+          if (urlBytes) {
+            let jsonUrl = ''
+            for (const byte of urlBytes) {
+              const charCode = parseInt(byte, 16)
+              if (charCode === 0) break
+              jsonUrl += String.fromCharCode(charCode)
+            }
+            
+            if (jsonUrl) {
+              // Convert IPFS URL to HTTP gateway
+              const httpUrl = convertIpfsUrl(jsonUrl)
+              
+              // Fetch the profile JSON
+              const response = await fetch(httpUrl)
+              if (response.ok) {
+                const profileJson = await response.json()
+                profileName = profileJson.LSP3Profile?.name || profileJson.name
+                profileDescription = profileJson.LSP3Profile?.description || profileJson.description
+                
+                // Get profile image and convert IPFS URL
+                const images = profileJson.LSP3Profile?.profileImage || profileJson.profileImage
+                if (images && images.length > 0) {
+                  const imageUrl = images[0]?.url || images[0]
+                  profileImage = convertIpfsUrl(imageUrl)
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing LSP3 profile data:', err)
+        }
       }
 
       setProfileData({
