@@ -1,338 +1,334 @@
+---
+name: universal-profile
+description: Manage LUKSO Universal Profile interactions - identity, permissions, and blockchain operations
+version: 1.0.0
+author: Clawdbot
+---
+
 # Universal Profile Skill
 
-**Version:** 1.0.0  
-**Author:** Clawdbot  
-**Repository:** https://github.com/openclaw/universalprofile-skill
+Enables Clawdbot to interact with LUKSO blockchain via Universal Profiles. Supports profile management, permission handling, key generation, and transaction execution.
 
-## Overview
+## Quick Start
 
-The Universal Profile skill enables Clawdbot to interact with LUKSO blockchain Universal Profiles, manage LSP tokens (LSP7 fungible, LSP8 NFTs), trade on decentralized exchanges, and deploy smart contracts.
-
-## Features
-
-### Core Capabilities
-- **Universal Profile Management** (LSP0)
-  - Create and configure Universal Profiles
-  - Manage profile metadata and permissions
-  - Execute transactions through Universal Profiles
-  
-- **Token Operations** (LSP7 & LSP8)
-  - Deploy LSP7 fungible tokens
-  - Deploy LSP8 NFTs with metadata
-  - Transfer tokens and NFTs
-  - Query balances and metadata
-  
-- **NFT Marketplace**
-  - List NFTs for sale
-  - Purchase NFTs
-  - Browse marketplace listings
-  - Manage collection metadata
-  
-- **DEX Trading**
-  - Swap tokens on LUKSO DEXs
-  - Query liquidity pools
-  - Check prices and slippage
-  
-- **Smart Contract Deployment**
-  - Deploy custom LSP contracts
-  - Verify contracts on LUKSO Explorer
-  - Manage contract permissions
-
-## Installation
-
-### Via npm (when published)
 ```bash
-npm install -g openclaw-universalprofile-skill
+# 1. Generate a controller key
+up key generate
+
+# 2. Check configuration status
+up status
+
+# 3. Get profile information
+up profile info <address>
 ```
 
-### From source
+## Commands
+
+### Key Management
+
+#### `up key generate`
+Generate a new controller key pair for Clawdbot.
+
 ```bash
-git clone https://github.com/openclaw/universalprofile-skill.git
-cd openclaw-universalprofile-skill
-npm install
-npm run build
-npm link
+up key generate [--save] [--password <password>]
+```
+
+Options:
+- `--save` - Save the key to encrypted keystore
+- `--password` - Password for keystore encryption (prompts if not provided)
+
+Example:
+```
+$ up key generate --save
+🔐 Generating new controller key...
+✓ Address: 0x1234...abcd
+✓ Public Key: 0x04abcd...
+✓ Key saved to keystore
+
+⚠️ IMPORTANT: Backup your key securely!
+```
+
+#### `up key list`
+List all stored controller keys.
+
+```bash
+up key list
+```
+
+#### `up key export`
+Export a key for backup purposes.
+
+```bash
+up key export <address> [--format json|mnemonic]
+```
+
+### Profile Management
+
+#### `up status`
+Check current UP configuration and connection status.
+
+```bash
+up status [--chain <chain>]
+```
+
+Example:
+```
+$ up status
+┌─────────────────────────────────────┐
+│ Universal Profile Status            │
+├─────────────────────────────────────┤
+│ Controller: 0x1234...abcd           │
+│ Default Chain: lukso (42)           │
+│ Profiles Configured: 1              │
+│ Keystore: ✓ Encrypted               │
+└─────────────────────────────────────┘
+```
+
+#### `up profile info`
+Display information about a Universal Profile.
+
+```bash
+up profile info [<address>] [--chain <chain>]
+```
+
+Example:
+```
+$ up profile info 0x1234...
+┌─────────────────────────────────────┐
+│ Universal Profile Info              │
+├─────────────────────────────────────┤
+│ Address: 0x1234...abcd              │
+│ Name: MyProfile                     │
+│ Key Manager: 0x5678...efgh          │
+│ Controllers: 2                      │
+│ Balance: 45.23 LYX                  │
+│ LSP7 Tokens: 5                      │
+│ LSP8 NFTs: 12                       │
+└─────────────────────────────────────┘
+```
+
+#### `up profile configure`
+Configure a Universal Profile for use with Clawdbot.
+
+```bash
+up profile configure <up-address> [--key-manager <km-address>] [--chain <chain>]
+```
+
+### Permission System
+
+#### `up permissions encode`
+Encode permissions into bytes32 format.
+
+```bash
+up permissions encode <permission1> [<permission2> ...]
+```
+
+Available permissions:
+- `CHANGEOWNER` - Transfer profile ownership
+- `ADDCONTROLLER` - Add new controllers
+- `EDITPERMISSIONS` - Modify controller permissions
+- `ADDEXTENSIONS` - Add profile extensions
+- `CHANGEEXTENSIONS` - Modify profile extensions
+- `ADDUNIVERSALRECEIVERDELEGATE` - Add receiver delegates
+- `CHANGEUNIVERSALRECEIVERDELEGATE` - Modify receiver delegates
+- `REENTRANCY` - Allow reentrant calls
+- `SUPER_TRANSFERVALUE` - Transfer value without restrictions
+- `TRANSFERVALUE` - Transfer native tokens
+- `SUPER_CALL` - Call any contract without restrictions
+- `CALL` - Call contracts (with AllowedCalls)
+- `SUPER_STATICCALL` - Static call without restrictions
+- `STATICCALL` - Static call contracts
+- `SUPER_DELEGATECALL` - Delegatecall without restrictions
+- `DELEGATECALL` - Delegatecall (dangerous)
+- `DEPLOY` - Deploy contracts
+- `SUPER_SETDATA` - Set any data
+- `SETDATA` - Set data (with AllowedERC725YDataKeys)
+- `ENCRYPT` - Encrypt data
+- `DECRYPT` - Decrypt data
+- `SIGN` - Sign messages
+- `EXECUTE_RELAY_CALL` - Execute relay calls
+
+Example:
+```
+$ up permissions encode CALL TRANSFERVALUE STATICCALL
+0x0000000000000000000000000000000000000000000000000000000000040801
+```
+
+#### `up permissions decode`
+Decode permissions from bytes32 format.
+
+```bash
+up permissions decode <permissions-hex>
+```
+
+Example:
+```
+$ up permissions decode 0x0000000000000000000000000000000000000000000000000000000000040801
+Permissions:
+  ✓ TRANSFERVALUE (0x1)
+  ✓ CALL (0x800)
+  ✓ STATICCALL (0x40000)
+```
+
+#### `up permissions presets`
+List available permission presets.
+
+```bash
+up permissions presets
+```
+
+Presets:
+- `read-only` - Can only read data (STATICCALL)
+- `token-operator` - Can transfer tokens/NFTs (CALL + TRANSFERVALUE)
+- `nft-trader` - Marketplace operations
+- `defi-trader` - DEX + marketplace operations
+- `profile-manager` - Can update profile data
+- `full-access` - All permissions (use with caution)
+
+#### `up permissions validate`
+Validate a permission set for security risks.
+
+```bash
+up permissions validate <permissions-hex>
+```
+
+Example:
+```
+$ up permissions validate 0x0001
+⚠️ WARNING: CHANGEOWNER permission detected!
+   This allows transferring profile ownership.
+   Risk Level: CRITICAL
+
+Recommendation: Only grant this permission to recovery addresses.
+```
+
+### Authorization
+
+#### `up authorize url`
+Generate authorization URL for users to add Clawdbot as controller.
+
+```bash
+up authorize url [--permissions <preset|hex>] [--chain <chain>]
+```
+
+Example:
+```
+$ up authorize url --permissions token-operator
+✓ Controller Address: 0xabcd...1234
+
+Authorization URL:
+https://up-auth.example.com/?controller=0xabcd...&permissions=0x...&chain=42
+
+QR Code saved to: /tmp/up-auth-qr.png
+
+Instructions:
+1. Open the URL in a browser with UP extension
+2. Connect your Universal Profile
+3. Review and approve the permissions
+4. Clawdbot will be added as a controller
+```
+
+### Configuration
+
+#### `up config show`
+Display current configuration.
+
+```bash
+up config show
+```
+
+#### `up config set`
+Set configuration values.
+
+```bash
+up config set <key> <value>
+```
+
+Keys:
+- `defaultChain` - Default chain (lukso, lukso-testnet)
+- `keystorePath` - Path to encrypted keystore
+- `rpcUrl` - Custom RPC URL
+
+#### `up config chain`
+Configure chain-specific settings.
+
+```bash
+up config chain <chain> --rpc <url> [--explorer <url>]
 ```
 
 ## Configuration
 
-### Environment Variables
+Configuration is stored in `~/.clawdbot/skills/universal-profile/config.json`:
 
-Create a `.env` file or set these in your environment:
-
-```bash
-# Required
-UP_PRIVATE_KEY=0x...          # Your Universal Profile controller private key
-UP_ADDRESS=0x...              # Your Universal Profile address (LSP0)
-
-# Optional
-LUKSO_RPC_URL=https://rpc.mainnet.lukso.network  # Default: LUKSO mainnet
-LUKSO_CHAIN_ID=42                                 # Default: LUKSO mainnet
-```
-
-### Clawdbot Integration
-
-Add to your Clawdbot `config.yaml`:
-
-```yaml
-skills:
-  universalprofile:
-    enabled: true
-    command: up
-    description: "LUKSO Universal Profile operations"
-```
-
-## CLI Usage
-
-The skill provides a `up` command-line interface:
-
-### Profile Management
-
-```bash
-# Create a new Universal Profile
-up profile create --name "My Profile"
-
-# Get profile information
-up profile info <address>
-
-# Update profile metadata
-up profile update --set-name "New Name" --set-image <ipfs-hash>
-```
-
-### Token Operations
-
-```bash
-# Deploy LSP7 fungible token
-up token deploy-lsp7 \
-  --name "My Token" \
-  --symbol "MTK" \
-  --decimals 18 \
-  --supply 1000000
-
-# Deploy LSP8 NFT collection
-up token deploy-lsp8 \
-  --name "My NFT Collection" \
-  --symbol "MNFT"
-
-# Transfer tokens
-up token transfer \
-  --token <token-address> \
-  --to <recipient-address> \
-  --amount 100
-
-# Mint NFT
-up token mint-nft \
-  --token <nft-address> \
-  --to <recipient-address> \
-  --token-id 1 \
-  --metadata <ipfs-hash>
-```
-
-### NFT Marketplace
-
-```bash
-# List NFT for sale
-up marketplace list \
-  --token <nft-address> \
-  --token-id 1 \
-  --price 10 \
-  --currency LYX
-
-# Buy NFT
-up marketplace buy \
-  --listing-id <listing-id>
-
-# Browse listings
-up marketplace browse --collection <collection-address>
-```
-
-### DEX Trading
-
-```bash
-# Swap tokens
-up dex swap \
-  --from-token <token-address> \
-  --to-token <token-address> \
-  --amount 100 \
-  --slippage 0.5
-
-# Get price quote
-up dex quote \
-  --from-token <token-address> \
-  --to-token <token-address> \
-  --amount 100
-```
-
-## Clawdbot Agent Usage
-
-When integrated with Clawdbot, use natural language:
-
-**Profile Management:**
-- "Create a new Universal Profile called 'Emmet AI'"
-- "Show me my UP profile info"
-- "Update my profile name to 'Emmet the Octopus'"
-
-**Token Operations:**
-- "Deploy an LSP7 token called 'EmmetCoin' with symbol EMT"
-- "Transfer 100 EMT tokens to 0x..."
-- "Mint an NFT in my collection with metadata from IPFS hash xyz"
-
-**Marketplace:**
-- "List my NFT #42 for sale at 10 LYX"
-- "Browse NFTs in the Chillwhales collection"
-- "Buy the NFT in listing ID 123"
-
-**DEX Trading:**
-- "Swap 50 LYX for CHILL tokens"
-- "What's the price to swap 100 CHILL for LYX?"
-
-## Architecture
-
-### Key Components
-
-```
-src/
-├── skill.ts          # Main skill implementation
-├── index.ts          # Entry point and exports
-├── lib/              # Core libraries
-│   ├── profile.ts    # Universal Profile operations
-│   ├── lsp7.ts       # LSP7 token operations
-│   ├── lsp8.ts       # LSP8 NFT operations
-│   ├── marketplace.ts # NFT marketplace integration
-│   ├── dex.ts        # DEX trading operations
-│   └── contract.ts   # Contract deployment utilities
-├── utils/            # Utility functions
-│   ├── ipfs.ts       # IPFS metadata handling
-│   └── validation.ts # Input validation
-└── types/            # TypeScript type definitions
-```
-
-### LSP Standards Supported
-
-- **LSP0** - Universal Profile (ERC725Account)
-- **LSP1** - Universal Receiver Delegate
-- **LSP2** - ERC725Y JSON Schema
-- **LSP3** - Universal Profile Metadata
-- **LSP4** - Digital Asset Metadata
-- **LSP6** - Key Manager (permissions)
-- **LSP7** - Digital Asset (Fungible Token)
-- **LSP8** - Identifiable Digital Asset (NFT)
-
-## Examples
-
-### Example 1: Deploy and Transfer LSP7 Token
-
-```typescript
-import { deployLSP7Token, transferLSP7 } from 'openclaw-universalprofile-skill';
-
-// Deploy token
-const tokenAddress = await deployLSP7Token({
-  name: 'MyToken',
-  symbol: 'MTK',
-  decimals: 18,
-  initialSupply: '1000000',
-  profileAddress: '0x...' // Your UP address
-});
-
-// Transfer tokens
-await transferLSP7({
-  tokenAddress,
-  from: '0x...', // Your UP address
-  to: '0x...',   // Recipient address
-  amount: '100'
-});
-```
-
-### Example 2: Create NFT Collection and Mint
-
-```typescript
-import { deployLSP8NFT, mintLSP8 } from 'openclaw-universalprofile-skill';
-
-// Deploy NFT collection
-const nftAddress = await deployLSP8NFT({
-  name: 'My NFT Collection',
-  symbol: 'MNFT',
-  profileAddress: '0x...'
-});
-
-// Mint NFT with metadata
-await mintLSP8({
-  nftAddress,
-  to: '0x...',
-  tokenId: '1',
-  metadata: {
-    name: 'Cool NFT #1',
-    description: 'A very cool NFT',
-    image: 'ipfs://...',
-    attributes: [
-      { trait_type: 'Rarity', value: 'Legendary' }
-    ]
+```json
+{
+  "keystorePath": "~/.clawdbot/skills/universal-profile/keystore.json",
+  "defaultChain": "lukso",
+  "chains": {
+    "lukso": {
+      "chainId": 42,
+      "rpcUrl": "https://42.rpc.thirdweb.com",
+      "explorer": "https://explorer.lukso.network"
+    },
+    "lukso-testnet": {
+      "chainId": 4201,
+      "rpcUrl": "https://rpc.testnet.lukso.network",
+      "explorer": "https://explorer.testnet.lukso.network"
+    }
+  },
+  "profiles": {
+    "42": {
+      "upAddress": "0x...",
+      "keyManagerAddress": "0x...",
+      "controllerAddress": "0x...",
+      "permissions": "0x..."
+    }
   }
-});
+}
 ```
 
-### Example 3: List and Sell NFT
+## Security
 
-```typescript
-import { listNFT, buyNFT } from 'openclaw-universalprofile-skill';
+### Key Storage
+- Private keys are encrypted at rest using AES-256-GCM
+- PBKDF2 with 100,000 iterations for key derivation
+- Keys are never logged or exposed in output
 
-// List NFT for sale
-const listingId = await listNFT({
-  nftAddress: '0x...',
-  tokenId: '1',
-  price: '10', // 10 LYX
-  seller: '0x...' // Your UP address
-});
+### Permission Safety
+- Dangerous permissions (CHANGEOWNER, DELEGATECALL) trigger warnings
+- Permission validation before execution
+- AllowedCalls restrictions recommended for CALL permission
+- AllowedERC725YDataKeys restrictions recommended for SETDATA
 
-// Buy NFT (as buyer)
-await buyNFT({
-  listingId,
-  buyer: '0x...' // Buyer UP address
-});
-```
+### Best Practices
+1. **Principle of Least Privilege** - Grant minimum necessary permissions
+2. **Use Presets** - Start with restrictive presets, expand as needed
+3. **Backup Keys** - Store encrypted backups securely
+4. **Review Transactions** - Inspect payloads before signing
+5. **Test First** - Use testnet before mainnet operations
 
-## Security Considerations
+## Error Codes
 
-### Private Key Management
-- **NEVER** commit private keys to version control
-- Use environment variables or secure key management systems
-- Consider using hardware wallets for production Universal Profiles
+| Code | Description |
+|------|-------------|
+| `UP001` | Key not found in keystore |
+| `UP002` | Invalid password for keystore |
+| `UP003` | Profile not configured |
+| `UP004` | Insufficient permissions |
+| `UP005` | Invalid permission format |
+| `UP006` | Chain not supported |
+| `UP007` | RPC connection failed |
+| `UP008` | Transaction failed |
 
-### Permission Management (LSP6)
-- Universal Profiles use LSP6 Key Manager for fine-grained permissions
-- Ensure controller keys have appropriate permissions for operations
-- Use separate keys for different permission levels
+## Dependencies
 
-### Transaction Signing
-- All transactions are signed by the Universal Profile controller
-- Transactions are executed through the Universal Profile (LSP0)
-- Gas is paid by the controller EOA, but executed in UP context
+This skill requires:
+- Node.js 18+
+- ethers.js v6
+- Network access to LUKSO RPC
 
-## Testing
+## Links
 
-```bash
-# Run tests
-npm test
-
-# Run tests with coverage
-npm run test:coverage
-```
-
-## Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Submit a pull request
-
-## Resources
-
-- [LUKSO Documentation](https://docs.lukso.tech)
-- [LSP Standards](https://github.com/lukso-network/LIPs/tree/main/LSPs)
-- [Universal Profile Playground](https://universalprofile.cloud)
-- [Clawdbot Documentation](https://docs.clawd.bot)
-
-## License
-
-MIT License - see LICENSE file for details
+- [LUKSO Documentation](https://docs.lukso.tech/)
+- [LSP6 Key Manager](https://docs.lukso.tech/standards/universal-profile/lsp6-key-manager)
+- [Universal Profile](https://universalprofile.cloud/)
