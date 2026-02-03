@@ -197,23 +197,23 @@ export interface PermissionPreset {
 }
 
 export const PERMISSION_PRESETS: Record<string, PermissionPreset> = {
-  'read-only': {
-    name: 'Read Only',
-    description: 'Can only read data from the profile and other contracts. Cannot make any changes.',
-    permissions: BigInt(PERMISSIONS.STATICCALL) | BigInt(PERMISSIONS.EXECUTE_RELAY_CALL),
-    recommended: true,
-  },
   'token-operator': {
     name: 'Token Operator',
-    description: 'Can transfer tokens and NFTs, and call token contracts.',
-    permissions: BigInt(PERMISSIONS.CALL) | BigInt(PERMISSIONS.TRANSFERVALUE) | BigInt(PERMISSIONS.EXECUTE_RELAY_CALL),
+    description: 'Can transfer tokens and NFTs, and call any contract.',
+    permissions: BigInt(PERMISSIONS.SUPER_CALL) | BigInt(PERMISSIONS.TRANSFERVALUE) | BigInt(PERMISSIONS.EXECUTE_RELAY_CALL),
     recommended: false,
   },
   'profile-manager': {
     name: 'Profile Manager',
-    description: 'Can update profile metadata and data.',
-    permissions: BigInt(PERMISSIONS.SETDATA) | BigInt(PERMISSIONS.STATICCALL) | BigInt(PERMISSIONS.EXECUTE_RELAY_CALL),
+    description: 'Can update profile metadata and data without restrictions.',
+    permissions: BigInt(PERMISSIONS.SUPER_SETDATA) | BigInt(PERMISSIONS.STATICCALL) | BigInt(PERMISSIONS.EXECUTE_RELAY_CALL),
     recommended: false,
+  },
+  'wallet': {
+    name: 'Wallet',
+    description: 'Full wallet capabilities: transfer tokens, update profile, and interact with contracts.',
+    permissions: BigInt(PERMISSIONS.SUPER_CALL) | BigInt(PERMISSIONS.TRANSFERVALUE) | BigInt(PERMISSIONS.SUPER_SETDATA) | BigInt(PERMISSIONS.STATICCALL) | BigInt(PERMISSIONS.EXECUTE_RELAY_CALL),
+    recommended: true,
   },
   'full-access': {
     name: 'Full Access',
