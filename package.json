@@ -1,0 +1,65 @@
+{
+  "name": "openclaw-universalprofile-skill",
+  "version": "1.0.0",
+  "description": "Universal Profile skill for Clawdbot - NFT marketplace, DEX trading, token deployment on LUKSO",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "up": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist",
+    "prepublish": "npm run build",
+    "ui:dev": "cd ui && npm run dev",
+    "ui:build": "cd ui && npm run build",
+    "ui:deploy": "./scripts/deploy-ui.sh"
+  },
+  "keywords": [
+    "lukso",
+    "universal-profile",
+    "lsp0",
+    "lsp6",
+    "lsp7",
+    "lsp8",
+    "nft",
+    "dex",
+    "blockchain",
+    "clawdbot"
+  ],
+  "author": "Clawdbot",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openclaw/universalprofile-skill.git"
+  },
+  "dependencies": {
+    "@erc725/erc725.js": "^0.25.0",
+    "@lukso/lsp-smart-contracts": "^0.15.0",
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "ethers": "^6.11.0",
+    "inquirer": "^9.2.0",
+    "ora": "^8.0.0",
+    "qrcode": "^1.5.3",
+    "table": "^6.8.1"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^20.11.0",
+    "@types/qrcode": "^1.5.5",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
