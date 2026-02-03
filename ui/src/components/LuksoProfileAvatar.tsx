@@ -45,7 +45,6 @@ const sizeMap: Record<string, LuksoSize> = {
 export function LuksoProfileAvatar({
   address,
   profileUrl,
-  name,
   size = 'md',
   showIdenticon = true,
   className = '',
