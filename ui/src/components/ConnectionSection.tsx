@@ -105,7 +105,7 @@ export function ConnectionSection({
         </div>
         <h3 className="text-lg font-semibold mb-2">Connect Your Universal Profile</h3>
         <p className="text-gray-600 dark:text-gray-400 mb-4">
-          Connect with the UP Browser Extension to authorize Clawdbot as a controller.
+          Connect with the UP Browser Extension to authorize OpenClaw as a controller.
         </p>
         
         {error && (

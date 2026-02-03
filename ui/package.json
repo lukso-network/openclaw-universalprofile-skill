@@ -1,7 +1,7 @@
 {
   "name": "up-authorization-ui",
   "version": "1.0.0",
-  "description": "Universal Profile Authorization UI for Clawdbot",
+  "description": "Universal Profile Authorization UI for OpenClaw",
   "private": true,
   "type": "module",
   "scripts": {

@@ -27,7 +27,7 @@ export function Header() {
             🤖
           </div>
           <div>
-            <h1 className="text-xl font-bold gradient-text">Clawdbot</h1>
+            <h1 className="text-xl font-bold gradient-text">OpenClaw</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">UP Authorization</p>
           </div>
         </div>

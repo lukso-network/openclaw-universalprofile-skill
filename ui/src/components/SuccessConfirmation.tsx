@@ -58,7 +58,7 @@ export function SuccessConfirmation({
             Authorization Successful! 🎉
           </h2>
           <p className="text-white/80">
-            Clawdbot is now authorized as a controller
+            OpenClaw is now authorized as a controller
           </p>
         </div>
 
@@ -142,7 +142,7 @@ export function SuccessConfirmation({
           <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
             <h4 className="font-medium text-gray-900 dark:text-white mb-2">What's Next?</h4>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Clawdbot can now interact with your Universal Profile using the granted permissions. 
+              OpenClaw can now interact with your Universal Profile using the granted permissions. 
               You can manage or revoke this controller's permissions anytime from your profile settings.
             </p>
           </div>

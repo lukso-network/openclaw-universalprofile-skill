@@ -1,6 +1,6 @@
 # Universal Profile Authorization UI
 
-A React-based web application for authorizing Clawdbot as a controller on LUKSO Universal Profiles.
+A React-based web application for authorizing OpenClaw as a controller on LUKSO Universal Profiles.
 
 ## Features
 

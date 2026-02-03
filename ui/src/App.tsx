@@ -92,10 +92,10 @@ function App() {
         {/* Introduction */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold gradient-text mb-2">
-            Authorize Clawdbot
+            Authorize OpenClaw
           </h1>
           <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-            Grant Clawdbot permission to interact with your Universal Profile on LUKSO
+            Grant OpenClaw permission to interact with your Universal Profile on LUKSO
           </p>
         </div>
 

@@ -63,7 +63,7 @@ export function ControllerInfo({
 
       <div className="space-y-4">
         <div>
-          <label className="label">Clawdbot's Controller Address</label>
+          <label className="label">OpenClaw's Controller Address</label>
           <div className="relative">
             <input
               type="text"
@@ -156,7 +156,7 @@ export function ControllerInfo({
             <div className="text-sm text-blue-700 dark:text-blue-300">
               <p className="font-medium">What is this?</p>
               <p className="mt-1 text-blue-600 dark:text-blue-400">
-                This is the address that Clawdbot will use to interact with your Universal Profile. 
+                This is the address that OpenClaw will use to interact with your Universal Profile. 
                 By authorizing this address, you're granting it specific permissions to act on your behalf.
               </p>
             </div>
