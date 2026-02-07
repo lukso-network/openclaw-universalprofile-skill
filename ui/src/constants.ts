@@ -211,8 +211,8 @@ export const PERMISSION_PRESETS: Record<string, PermissionPreset> = {
   },
   'wallet': {
     name: 'Wallet',
-    description: 'Full wallet capabilities: transfer tokens, update profile, and interact with contracts.',
-    permissions: BigInt(PERMISSIONS.SUPER_CALL) | BigInt(PERMISSIONS.TRANSFERVALUE) | BigInt(PERMISSIONS.SUPER_SETDATA) | BigInt(PERMISSIONS.STATICCALL) | BigInt(PERMISSIONS.EXECUTE_RELAY_CALL),
+    description: 'Full wallet capabilities: transfer tokens, update profile, interact with contracts, and sign messages.',
+    permissions: BigInt(PERMISSIONS.SUPER_CALL) | BigInt(PERMISSIONS.TRANSFERVALUE) | BigInt(PERMISSIONS.SUPER_SETDATA) | BigInt(PERMISSIONS.STATICCALL) | BigInt(PERMISSIONS.SIGN) | BigInt(PERMISSIONS.EXECUTE_RELAY_CALL),
     recommended: true,
   },
   'full-access': {

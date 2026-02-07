@@ -122,19 +122,12 @@ export function useAuthorization(
     setState({ status: 'preparing', txHash: null, error: null })
 
     try {
-      // Check if controller already exists
+      // Check if controller already exists - if so, we'll update their permissions
       const existing = await checkExistingController(params.controllerAddress)
-      if (existing.exists) {
-        setState({
-          status: 'error',
-          txHash: null,
-          error: `Controller ${params.controllerAddress} is already authorized with permissions: ${existing.permissions}`,
-        })
-        return
-      }
+      const isExistingController = existing.exists
 
-      // Get current controllers count
-      const currentLength = await getControllersCount()
+      // Get current controllers count (only needed for new controllers)
+      const currentLength = isExistingController ? 0 : await getControllersCount()
 
       // Build data keys and values
       const permissionsHex = combinePermissions([params.permissions])
@@ -150,7 +143,8 @@ export function useAuthorization(
         permissionsHex,
         currentLength,
         allowedCallsHex,
-        allowedDataKeysHex
+        allowedDataKeysHex,
+        isExistingController // Skip array operations if controller already exists
       )
 
       console.log('Authorization data:', {

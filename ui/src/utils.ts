@@ -78,27 +78,32 @@ export function getArrayIndexDataKey(index: number): Hex {
 }
 
 /**
- * Build the data keys and values for adding a new controller
+ * Build the data keys and values for adding a new controller or updating an existing one
+ * @param isExisting - If true, skip adding to the array (controller already exists)
  */
 export function buildControllerData(
   controllerAddress: Address,
   permissions: Hex,
   currentLength: number,
   allowedCalls?: Hex,
-  allowedDataKeys?: Hex
+  allowedDataKeys?: Hex,
+  isExisting: boolean = false
 ): { dataKeys: Hex[]; dataValues: Hex[] } {
   const dataKeys: Hex[] = []
   const dataValues: Hex[] = []
 
-  // 1. Update array length
-  dataKeys.push(DATA_KEYS['AddressPermissions[]'] as Hex)
-  dataValues.push(pad(toHex(currentLength + 1), { size: 16 }))
+  // Only add to array if this is a new controller
+  if (!isExisting) {
+    // 1. Update array length
+    dataKeys.push(DATA_KEYS['AddressPermissions[]'] as Hex)
+    dataValues.push(pad(toHex(currentLength + 1), { size: 16 }))
 
-  // 2. Add controller address to array at new index
-  dataKeys.push(getArrayIndexDataKey(currentLength))
-  dataValues.push(pad(controllerAddress, { size: 20 }))
+    // 2. Add controller address to array at new index
+    dataKeys.push(getArrayIndexDataKey(currentLength))
+    dataValues.push(pad(controllerAddress, { size: 20 }))
+  }
 
-  // 3. Set permissions for controller
+  // 3. Set permissions for controller (always do this)
   dataKeys.push(getPermissionsDataKey(controllerAddress))
   dataValues.push(permissions)
 

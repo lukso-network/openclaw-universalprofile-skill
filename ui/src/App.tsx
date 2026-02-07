@@ -42,6 +42,8 @@ function App() {
   
   // Error state
   const [error, setError] = useState<string | null>(null)
+  // Info state for existing controller (not an error, just informational)
+  const [existingControllerInfo, setExistingControllerInfo] = useState<string | null>(null)
 
   // Check for existing controller when wallet connects
   useEffect(() => {
@@ -49,10 +51,14 @@ function App() {
       if (wallet.isConnected && controllerAddress) {
         const existing = await authorization.checkExistingController(controllerAddress)
         if (existing.exists) {
-          setError(`This controller is already authorized with permissions: ${existing.permissions}`)
+          // This is informational, not an error - user can still update permissions
+          setExistingControllerInfo(`This controller already has permissions: ${existing.permissions}. You can update them below.`)
+          setError(null) // Clear any previous error
         } else {
-          setError(null)
+          setExistingControllerInfo(null)
         }
+      } else {
+        setExistingControllerInfo(null)
       }
     }
     checkController()
@@ -145,6 +151,23 @@ function App() {
           </section>
         )}
 
+        {/* Existing controller info (informational, not blocking) */}
+        {existingControllerInfo && (
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-medium text-blue-700 dark:text-blue-400">Controller Already Authorized</h4>
+                <p className="text-sm text-blue-600 dark:text-blue-300 mt-1 break-words overflow-wrap-anywhere">
+                  {existingControllerInfo}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Error display */}
         {(error || authorization.error) && (
           <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
@@ -152,9 +175,9 @@ function App() {
               <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h4 className="font-medium text-red-700 dark:text-red-400">Error</h4>
-                <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                <p className="text-sm text-red-600 dark:text-red-300 mt-1 break-words overflow-wrap-anywhere whitespace-pre-wrap">
                   {error || authorization.error}
                 </p>
               </div>
