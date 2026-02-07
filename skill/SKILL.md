@@ -339,13 +339,18 @@ const signature = await controller.signMessage(
   ethers.getBytes(ethers.keccak256(encoded))
 );
 
-// 4a. Send to relay service
-await fetch('https://relayer.lukso.network/execute', {
+// 4a. Send to relay service (LSP-15 format)
+await fetch('https://relayer.lukso.network/api/v3/execute', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    keyManagerAddress: '0xKMAddress', signature,
-    nonce: nonce.toString(), validityTimestamps: '0', payload, value: '0',
+    address: '0xUPAddress', // Universal Profile address
+    transaction: {
+      abi: payload, // The payload itself (setData, execute, etc.)
+      signature: signature,
+      nonce: nonce.toString(),
+      validityTimestamps: '0x0' // hex string, 0 = valid indefinitely
+    }
   }),
 });
 
@@ -373,14 +378,36 @@ await setDataViaRelay(signer, upAddr, kmAddr, dataKey, dataValue, { relayerUrl: 
 const quota = await checkRelayQuota('https://relayer.lukso.network', upAddr);
 ```
 
-### Relay Service Endpoints
+### Relay Service Endpoints (LSP-15)
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/execute` | POST | Submit signed relay transaction |
-| `/quota/<address>` | GET | Check remaining quota |
+| `/api/v3/execute` | POST | Submit signed relay transaction (LSP-15 format) |
+| `/quota` | POST | Check remaining quota |
 
 **URLs:** Mainnet `https://relayer.lukso.network` · Testnet `https://relayer.testnet.lukso.network`
+
+**LSP-15 Request Format:**
+```json
+{
+  "address": "0xUPAddress",
+  "transaction": {
+    "abi": "0x...",  // The payload (e.g., setData call)
+    "signature": "0x...",
+    "nonce": "0",
+    "validityTimestamps": "0x0"  // Optional, 0 = indefinite
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "transactionHash": "0x..."
+}
+```
+
+See [LSP-15-TransactionRelayServiceAPI](https://github.com/lukso-network/LIPs/blob/main/LSPs/LSP-15-TransactionRelayServiceAPI.md) for full spec.
 
 ### Direct vs. Relay
 
