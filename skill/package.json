@@ -1,5 +1,5 @@
 {
-  "name": "@clawdbot/skill-universal-profile",
+  "name": "skill-universal-profile",
   "version": "1.0.0",
   "description": "Universal Profile skill for Clawdbot - LUKSO blockchain identity and permission management",
   "main": "index.js",

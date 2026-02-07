@@ -296,66 +296,126 @@ function createValidityTimestamps(duration = 3600) {
 
 ### LSP25 Signature Format
 
+The signature MUST be constructed using EIP-191 version 0 ("intended validator"):
+
 ```javascript
-const encoded = ethers.solidityPacked(
+// Step 1: Encode the message (same as Solidity's abi.encodePacked)
+const encodedMessage = ethers.solidityPacked(
   ['uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bytes'],
   [25, chainId, nonce, validityTimestamps, msgValue, abiPayload]
   // 25 = LSP25_VERSION (always 25)
 );
-const hash = ethers.keccak256(encoded);
-const signature = await signer.signMessage(ethers.getBytes(hash));
+
+// Step 2: Create EIP-191 v0 hash with Key Manager as intended validator
+// Format: keccak256(0x19 || 0x00 || keyManagerAddress || encodedMessage)
+function hashDataWithIntendedValidator(validatorAddress, data) {
+  const prefix = new Uint8Array([0x19, 0x00]);
+  const validatorBytes = ethers.getBytes(validatorAddress);
+  const dataBytes = ethers.getBytes(data);
+  
+  const message = new Uint8Array(prefix.length + validatorBytes.length + dataBytes.length);
+  message.set(prefix, 0);
+  message.set(validatorBytes, prefix.length);
+  message.set(dataBytes, prefix.length + validatorBytes.length);
+  
+  return ethers.keccak256(message);
+}
+const hash = hashDataWithIntendedValidator(keyManagerAddress, encodedMessage);
+
+// Step 3: Sign the raw hash (NOT signMessage - that adds wrong prefix!)
+const signingKey = new ethers.SigningKey(privateKey);
+const sig = signingKey.sign(hash);
+const signature = ethers.Signature.from(sig).serialized;
+```
+
+**CRITICAL:** Do NOT use `signer.signMessage()` - it adds an "Ethereum Signed Message" prefix (EIP-191 v45) which is wrong. Use `SigningKey.sign()` on the raw hash.
+
+Alternatively, use the [@lukso/eip191-signer.js](https://www.npmjs.com/package/@lukso/eip191-signer.js) library:
+
+```javascript
+import { EIP191Signer } from '@lukso/eip191-signer.js';
+const eip191Signer = new EIP191Signer();
+const { signature } = await eip191Signer.signDataWithIntendedValidator(
+  keyManagerAddress, // The Key Manager contract address
+  encodedMessage,    // The packed message
+  privateKey         // Controller's private key (hex with 0x prefix)
+);
 ```
 
 ### Complete Example: Gasless LYX Transfer
 
 ```javascript
 import { ethers } from 'ethers';
-const provider = new ethers.JsonRpcProvider('https://42.rpc.thirdweb.com');
-const controller = new ethers.Wallet('0xCONTROLLER_KEY');
 
-const upIface = new ethers.Interface([
-  'function execute(uint256, address, uint256, bytes) payable returns (bytes)',
-]);
-const km = new ethers.Contract('0xKMAddress', [
+const provider = new ethers.JsonRpcProvider('https://42.rpc.thirdweb.com');
+const CONTROLLER_PRIVATE_KEY = '0xYOUR_CONTROLLER_PRIVATE_KEY';
+const UP_ADDRESS = '0xYourUPAddress';
+const CONTROLLER_ADDRESS = '0xYourControllerAddress';
+
+// Get Key Manager address
+const up = new ethers.Contract(UP_ADDRESS, ['function owner() view returns (address)'], provider);
+const keyManagerAddress = await up.owner();
+
+const km = new ethers.Contract(keyManagerAddress, [
   'function executeRelayCall(bytes, uint256, uint256, bytes) payable returns (bytes)',
   'function getNonce(address, uint128) view returns (uint256)',
 ], provider);
 
 // 1. Encode payload
+const upIface = new ethers.Interface([
+  'function execute(uint256, address, uint256, bytes) payable returns (bytes)',
+]);
 const payload = upIface.encodeFunctionData('execute', [
   0, '0xRecipient', ethers.parseEther('3'), '0x',
 ]);
 
 // 2. Get nonce
-const nonce = await km.getNonce(controller.address, 0);
-const { chainId } = await provider.getNetwork();
+const nonce = await km.getNonce(CONTROLLER_ADDRESS, 0);
+const chainId = 42; // LUKSO mainnet
 
-// 3. Sign (LSP25)
-const encoded = ethers.solidityPacked(
+// 3. Create LSP25 encoded message
+const encodedMessage = ethers.solidityPacked(
   ['uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bytes'],
-  [25, chainId, nonce, 0n, 0n, payload]
-);
-const signature = await controller.signMessage(
-  ethers.getBytes(ethers.keccak256(encoded))
+  [25, chainId, nonce, 0n, 0n, payload]  // 25 = LSP25_VERSION
 );
 
-// 4a. Send to relay service (LSP-15 format)
-await fetch('https://relayer.lukso.network/api/v3/execute', {
+// 4. Create EIP-191 v0 hash with Key Manager as validator
+function hashDataWithIntendedValidator(validatorAddress, data) {
+  const prefix = new Uint8Array([0x19, 0x00]);
+  const validatorBytes = ethers.getBytes(validatorAddress);
+  const dataBytes = ethers.getBytes(data);
+  const message = new Uint8Array(prefix.length + validatorBytes.length + dataBytes.length);
+  message.set(prefix, 0);
+  message.set(validatorBytes, prefix.length);
+  message.set(dataBytes, prefix.length + validatorBytes.length);
+  return ethers.keccak256(message);
+}
+const hash = hashDataWithIntendedValidator(keyManagerAddress, encodedMessage);
+
+// 5. Sign the raw hash (NOT signMessage!)
+const signingKey = new ethers.SigningKey(CONTROLLER_PRIVATE_KEY);
+const sig = signingKey.sign(hash);
+const signature = ethers.Signature.from(sig).serialized;
+
+// 6a. Send to relay service (LSP-15 format)
+// Mainnet: https://relayer.lukso.network/v1/relayer/execute
+// Testnet: https://relayer.testnet.lukso.network/v1/relayer/execute
+await fetch('https://relayer.lukso.network/v1/relayer/execute', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    address: '0xUPAddress', // Universal Profile address
+    address: UP_ADDRESS,  // Universal Profile address (NOT Key Manager!)
     transaction: {
-      abi: payload, // The payload itself (setData, execute, etc.)
+      abi: payload,       // The payload to execute on UP
       signature: signature,
-      nonce: nonce.toString(),
-      validityTimestamps: '0x0' // hex string, 0 = valid indefinitely
+      nonce: Number(nonce),
+      validityTimestamps: '0x0'  // hex string, 0 = valid indefinitely
     }
   }),
 });
 
-// 4b. Or execute on-chain (funded account pays gas)
-const relayer = new ethers.Wallet('0xRELAYER_KEY', provider);
+// 6b. Or execute on-chain directly (funded account pays gas)
+const relayer = new ethers.Wallet('0xFUNDED_RELAYER_KEY', provider);
 await (await km.connect(relayer).executeRelayCall(signature, nonce, 0n, payload)).wait();
 ```
 
@@ -382,10 +442,12 @@ const quota = await checkRelayQuota('https://relayer.lukso.network', upAddr);
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v3/execute` | POST | Submit signed relay transaction (LSP-15 format) |
-| `/quota` | POST | Check remaining quota |
+| `/v1/relayer/execute` | POST | Submit signed relay transaction (LSP-15 format) |
+| `/v1/relayer/quota` | POST | Check remaining quota |
 
-**URLs:** Mainnet `https://relayer.lukso.network` · Testnet `https://relayer.testnet.lukso.network`
+**URLs:**
+- Mainnet: `https://relayer.lukso.network/v1/relayer/execute`
+- Testnet: `https://relayer.testnet.lukso.network/v1/relayer/execute`
 
 **LSP-15 Request Format:**
 ```json
