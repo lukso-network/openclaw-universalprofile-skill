@@ -1,7 +1,7 @@
 ---
 name: universal-profile
 description: Manage LUKSO Universal Profiles — identity, permissions, tokens, and blockchain operations via direct or gasless relay transactions
-version: 0.3.3
+version: 0.3.4
 author: frozeman
 ---
 
@@ -188,7 +188,9 @@ Full ABIs, interface IDs, and ERC725Y data keys are in `lib/constants.js`.
 
 Used for LSP3 profile metadata, LSP4 asset metadata, and any on-chain JSON reference.
 
-**Format:** `0x` + `0000` (2 bytes verification method) + `6f357c6a` (4 bytes = keccak256(utf8) hash function) + `0020` (2 bytes = hash length 32) + `<keccak256 hash>` (32 bytes) + `<url as UTF-8 hex>`
+**Format (hex):** `0x` + `0000` (2 bytes verification method) + `6f357c6a` (4 bytes = keccak256(utf8) hash function) + `0020` (2 bytes = hash length 32) + `<keccak256 hash>` (32 bytes) + `<url as UTF-8 hex>`
+
+**Header is always `00006f357c6a0020` (16 hex chars = 8 bytes).**
 
 ```javascript
 const jsonBytes = fs.readFileSync('metadata.json');
@@ -205,9 +207,27 @@ const hex = data.slice(2);        // remove 0x
 const url = Buffer.from(hex.slice(80), 'hex').toString('utf8');
 ```
 
-**⚠️ Common mistake:** Forgetting the `0020` hash length bytes between the hash function selector and the actual hash. Without it, the URL offset is wrong and parsers will read garbage.
+**⚠️ Common mistakes:**
+1. **Forgetting `0020`** — the 2-byte hash length between the hash function selector and the actual hash. Without it, the URL offset is wrong and parsers read garbage, breaking the entire profile.
+2. **Not pinning to a public IPFS service before setting on-chain** — local IPFS nodes are not reachable by gateways. Always pin via a service (e.g. Forever Moments Pinata proxy at `POST /api/pinata`) and verify the file is accessible via `https://api.universalprofile.cloud/ipfs/<CID>` BEFORE submitting the on-chain transaction.
+3. **Hash must match the exact bytes stored on IPFS** — compute keccak256 from the exact JSON string you upload, not a re-serialized version.
+4. **Using `hashFunction`/`hash` instead of `verification` object** in LSP3 metadata JSON — image entries (profileImage, backgroundImage) should use `{ "verification": { "method": "keccak256(bytes)", "data": "0x..." }, "url": "ipfs://..." }` format, NOT the legacy `{ "hashFunction": "...", "hash": "0x..." }` format.
 
 **LSP3Profile data key:** `0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5`
+
+### Updating LSP3 Profile Metadata — Full Procedure
+
+1. **Read current profile** — `getData(LSP3_KEY)` → decode VerifiableURI → fetch JSON from IPFS
+2. **Modify the JSON** — update fields (name, description, links, images, etc.)
+3. **Use `verification` format for images** — `{ verification: { method: "keccak256(bytes)", data: "0x..." }, url: "ipfs://..." }`
+4. **Pin new images to IPFS** — upload via pinning service, get CID, verify accessible
+5. **Pin updated JSON to IPFS** — upload, get CID, verify accessible via gateway
+6. **Compute hash** — `keccak256(exactJsonBytes)` of the uploaded file
+7. **Encode VerifiableURI** — `0x00006f357c6a0020` + hash + url hex
+8. **Set on-chain** — `up.setData(LSP3_KEY, verifiableUri)` from controller
+9. **Verify** — read back on-chain data, decode, fetch from IPFS, confirm profile loads
+
+**NEVER submit the on-chain transaction until step 5 is verified.**
 
 **LSP28TheGrid data key:** `0x724141d9918ce69e6b8afcf53a91748466086ba2c74b94cab43c649ae2ac23ff`
 
