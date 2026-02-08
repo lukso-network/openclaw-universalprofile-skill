@@ -120,9 +120,21 @@ up profile configure 0xYourUPAddress --chain lukso
 up status
 ```
 
-### Configuration File
+### Credential Loading
 
-Stored at `~/.clawdbot/universal-profile/config.json`:
+The skill checks multiple locations for credentials (in order):
+
+1. **Environment variable:** `UP_CREDENTIALS_PATH`
+2. **OpenClaw standard:** `~/.openclaw/universal-profile/config.json`
+3. **Legacy location:** `~/.clawdbot/universal-profile/config.json`
+4. **Local directory:** `./credentials/config.json`
+
+Key files are searched in similar locations:
+- `UP_KEY_PATH` environment variable
+- `~/.openclaw/credentials/universal-profile-key.json`
+- `~/.clawdbot/credentials/universal-profile-key.json`
+
+### Configuration File
 
 ```json
 {
@@ -149,6 +161,62 @@ Stored at `~/.clawdbot/universal-profile/config.json`:
   }
 }
 ```
+
+### Module Architecture
+
+The skill is organized into modular layers for maintainability and extensibility:
+
+```
+skill/
+├── lib/
+│   ├── constants.js          # Permissions, ABIs, data keys, explorer URLs
+│   ├── credentials.js        # Flexible credential loading
+│   ├── provider.js           # RPC provider setup
+│   │
+│   ├── execute/              # GENERIC execution layer
+│   │   ├── direct.js         # Direct transactions (controller pays gas)
+│   │   └── relay.js          # Relay API (gasless via LSP25)
+│   │
+│   ├── up/                   # Universal Profile operations
+│   │   ├── execute.js        # Wrap calls in UP.execute()
+│   │   ├── data.js           # setData, getData
+│   │   └── social.js         # follow, unfollow (LSP26)
+│   │
+│   └── tokens/               # Token-specific modules
+│       ├── lsp7.js           # LSP7 Digital Assets (fungible)
+│       └── lsp8.js           # LSP8 NFTs (identifiable)
+│
+├── cli/                      # CLI commands
+│   ├── transfer.js           # Token transfers
+│   ├── query.js              # Query assets/balances
+│   └── profile.js            # Profile operations
+│
+└── examples/                 # Usage examples
+```
+
+**Design Principles:**
+
+1. **Separation of Concerns:**
+   - Execute layer handles HOW (direct vs relay)
+   - Token modules handle WHAT (LSP7, LSP8 payloads)
+   - Neither depends on the other
+
+2. **Generic Relay Execution:**
+   - `executeRelay(payload)` works with ANY payload
+   - Token modules just build payloads
+   - Easy to add new token types or operations
+
+3. **Usage Example:**
+   ```javascript
+   import { executeRelay } from './lib/execute/relay.js';
+   import { buildExecutePayload } from './lib/up/execute.js';
+   import { buildTransferPayload } from './lib/tokens/lsp7.js';
+
+   // Build token transfer → wrap in UP.execute → send via relay
+   const tokenPayload = buildTransferPayload(token, from, to, amount, true);
+   const upPayload = buildExecutePayload(0, token, 0, tokenPayload);
+   const txHash = await executeRelay(upPayload);  // or executeDirect(upPayload)
+   ```
 
 ---
 
