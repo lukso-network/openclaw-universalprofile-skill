@@ -51,6 +51,7 @@ security add-generic-password \
   -l "UP Controller Key" \
   -D "Ethereum Private Key" \
   -w "<private-key>" \
+  -T /usr/bin/security \
   -U
 ```
 
@@ -73,7 +74,7 @@ privateKey = null; // Clear from memory
 ```
 
 **Notes:**
-- macOS will show a system prompt the first time an app accesses the key — this is expected and provides user oversight
+- `-T /usr/bin/security` grants the `security` CLI access without a GUI prompt, required for automated agent use
 - Apple's Secure Enclave does not support secp256k1 (Ethereum's curve), so the key must be extracted for signing — but it stays in memory only, never on disk
 - After storing in Keychain, delete the JSON credentials file
 - **This approach is macOS-only.** On Linux, consider using a secrets manager, encrypted keyring, or environment variables instead
