@@ -5,7 +5,8 @@
  * Usage:
  *   node transfer-lsp7.js <token-address> <to-address> <amount> [--force]
  * 
- * Note: Amount should include decimals (e.g., "1000000000000000000" for 1 token with 18 decimals)
+ * Amount is in human-readable format (e.g., "5" for 5 tokens)
+ * Decimals are queried from the token contract automatically
  */
 
 import { ethers } from 'ethers';
@@ -32,7 +33,7 @@ const UP_ABI = [
   'function execute(uint256 operation, address target, uint256 value, bytes data) external payable returns (bytes)'
 ];
 
-async function transferLSP7(tokenAddress, toAddress, amount, force = false) {
+async function transferLSP7(tokenAddress, toAddress, humanAmount, force = false) {
   try {
     // Load config
     const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
@@ -47,25 +48,32 @@ async function transferLSP7(tokenAddress, toAddress, amount, force = false) {
     const upContract = new ethers.Contract(upAddress, UP_ABI, signer);
     const tokenContract = new ethers.Contract(tokenAddress, LSP7_ABI, provider);
 
+    // Query decimals from token contract
+    const decimals = await tokenContract.decimals();
+    console.log(`Token decimals: ${decimals}`);
+
+    // Convert human amount to wei using token's decimals
+    const amount = ethers.parseUnits(humanAmount, decimals);
+
     // Check balance
     const balance = await tokenContract.balanceOf(upAddress);
-    console.log(`Current balance: ${ethers.formatUnits(balance, 18)} tokens`);
+    console.log(`Current balance: ${ethers.formatUnits(balance, decimals)} tokens`);
     
-    if (balance < BigInt(amount)) {
-      throw new Error(`Insufficient balance. Have: ${balance}, Need: ${amount}`);
+    if (balance < amount) {
+      throw new Error(`Insufficient balance. Have: ${ethers.formatUnits(balance, decimals)}, Need: ${humanAmount}`);
     }
 
     // Encode LSP7 transfer call
     const transferData = tokenContract.interface.encodeFunctionData('transfer', [
       upAddress,         // from (the UP itself)
       toAddress,         // to
-      amount,            // amount
+      amount,            // amount (in wei)
       force,             // force (allow transfers to non-LSP1 contracts)
       '0x'               // data (empty)
     ]);
 
     // Execute via UP (operation=0 for CALL)
-    console.log(`Transferring ${ethers.formatUnits(amount, 18)} tokens to ${toAddress}...`);
+    console.log(`Transferring ${humanAmount} tokens to ${toAddress}...`);
     
     const tx = await upContract.execute(
       0,           // CALL operation
@@ -100,7 +108,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   if (!tokenAddress || !toAddress || !amount) {
     console.error('Usage: node transfer-lsp7.js <token-address> <to-address> <amount> [--force]');
-    console.error('Example: node transfer-lsp7.js 0x... 0x... 1000000000000000000 --force');
+    console.error('Example: node transfer-lsp7.js 0x... 0x... 5 --force');
+    console.error('Amount is in human-readable format (decimals are queried automatically)');
     process.exit(1);
   }
 
