@@ -1,7 +1,7 @@
 ---
 name: universal-profile
 description: Manage LUKSO Universal Profiles — identity, permissions, tokens, and blockchain operations via direct or gasless relay transactions
-version: 0.3.1
+version: 0.3.2
 author: frozeman
 ---
 
@@ -182,6 +182,31 @@ Permissions are a bytes32 BitArray at `AddressPermissions:Permissions:<address>`
 | LSP26 (`0x2b299cea`) | FollowerSystem | On-chain follow/unfollow |
 
 Full ABIs, interface IDs, and ERC725Y data keys are in `lib/constants.js`.
+
+## VerifiableURI Encoding (LSP2)
+
+Used for LSP3 profile metadata, LSP4 asset metadata, and any on-chain JSON reference.
+
+**Format:** `0x` + `0000` (2 bytes verification method) + `6f357c6a` (4 bytes = keccak256(utf8) hash function) + `0020` (2 bytes = hash length 32) + `<keccak256 hash>` (32 bytes) + `<url as UTF-8 hex>`
+
+```javascript
+const jsonBytes = fs.readFileSync('metadata.json');
+const jsonHash = ethers.keccak256(jsonBytes);
+const url = `ipfs://${cid}`;
+const urlHex = Buffer.from(url, 'utf8').toString('hex');
+const verifiableURI = '0x' + '00006f357c6a0020' + jsonHash.slice(2) + urlHex;
+```
+
+**Decoding:**
+```javascript
+const hex = data.slice(2);        // remove 0x
+// Skip: 0000(4) + 6f357c6a(8) + 0020(4) + hash(64) = 80 hex chars
+const url = Buffer.from(hex.slice(80), 'hex').toString('utf8');
+```
+
+**⚠️ Common mistake:** Forgetting the `0020` hash length bytes between the hash function selector and the actual hash. Without it, the URL offset is wrong and parsers will read garbage.
+
+**LSP3Profile data key:** `0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5`
 
 ## Network Config
 
