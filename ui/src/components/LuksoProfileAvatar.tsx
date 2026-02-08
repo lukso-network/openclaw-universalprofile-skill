@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { convertIpfsUrl } from '../utils';
 
 // Import lukso components on client side only
 if (typeof window !== 'undefined') {
@@ -57,6 +58,12 @@ export function LuksoProfileAvatar({
 
   const luksoSize = sizeMap[size] || 'small';
 
+  // Always convert IPFS URLs to HTTP gateway URLs
+  const resolvedProfileUrl = useMemo(() => {
+    if (!profileUrl) return undefined;
+    return convertIpfsUrl(profileUrl);
+  }, [profileUrl]);
+
   // Show placeholder during SSR
   if (!isMounted) {
     return <div className={`rounded-full bg-gray-200 animate-pulse ${className}`} />;
@@ -64,7 +71,7 @@ export function LuksoProfileAvatar({
 
   return (
     <lukso-profile
-      profile-url={profileUrl || undefined}
+      profile-url={resolvedProfileUrl}
       profile-address={address}
       has-identicon={showIdenticon}
       size={luksoSize}

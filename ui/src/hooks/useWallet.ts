@@ -196,11 +196,12 @@ export function useWallet() {
       // Parse LSP3 profile data if available
       if (profileData && profileData !== '0x' && profileData.length > 10) {
         try {
-          // LSP3 data format: bytes4 hashFunction + bytes4 dataLength + bytes dataContent
-          // Skip first 6 bytes (0x + 4 bytes hash function) and get the URL
-          const dataWithoutPrefix = profileData.slice(10)
-          // Convert hex to string to get IPFS URL
-          const urlBytes = dataWithoutPrefix.match(/.{1,2}/g)
+          // VerifiableURI format: bytes4(hashFunction) + bytes32(hash) + bytes(url)
+          // = 4 + 32 = 36 bytes = 72 hex chars after 0x prefix
+          const urlHex = profileData.slice(2 + 72) // skip 0x + 36 bytes
+          
+          // Convert hex to string to get the URL
+          const urlBytes = urlHex.match(/.{1,2}/g)
           if (urlBytes) {
             let jsonUrl = ''
             for (const byte of urlBytes) {
@@ -223,8 +224,11 @@ export function useWallet() {
                 // Get profile image and convert IPFS URL
                 const images = profileJson.LSP3Profile?.profileImage || profileJson.profileImage
                 if (images && images.length > 0) {
-                  const imageUrl = images[0]?.url || images[0]
-                  profileImage = convertIpfsUrl(imageUrl)
+                  // Image can be an object {url, width, height, ...} or a string
+                  const imageUrl = typeof images[0] === 'string' ? images[0] : images[0]?.url
+                  if (imageUrl) {
+                    profileImage = convertIpfsUrl(imageUrl)
+                  }
                 }
               }
             }
