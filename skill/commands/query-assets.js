@@ -11,6 +11,11 @@
 const INDEXER_ENDPOINT = 'https://envio.lukso-mainnet.universal.tech/v1/graphql';
 
 export async function queryAssets(upAddress) {
+  // Validate address format to prevent GraphQL injection
+  if (!upAddress || !/^0x[a-fA-F0-9]{40}$/.test(upAddress)) {
+    throw new Error('Invalid address format. Expected 0x followed by 40 hex characters.');
+  }
+
   const query = `{
     Hold(where: { profile_id: { _ilike: "${upAddress.toLowerCase()}" } }) {
       asset_id
