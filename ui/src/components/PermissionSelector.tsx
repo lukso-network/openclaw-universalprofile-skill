@@ -63,13 +63,15 @@ export function PermissionSelector({
     }
   }, [existingPermissions])
 
-  // Update custom permissions when value changes
+  // Initialize custom permissions only when switching TO custom mode
+  const prevModeRef = useRef<Mode>(mode)
   useEffect(() => {
-    if (mode === 'custom' && value) {
+    if (mode === 'custom' && prevModeRef.current === 'preset' && value) {
       const decoded = decodePermissions(value.toString())
       setCustomPermissions(new Set(decoded))
     }
-  }, [value, mode])
+    prevModeRef.current = mode
+  }, [mode, value])
 
   const handlePresetSelect = (presetKey: string) => {
     setSelectedPreset(presetKey)
