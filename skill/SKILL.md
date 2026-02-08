@@ -41,7 +41,7 @@ Key files: `UP_KEY_PATH` env → `~/.openclaw/credentials/universal-profile-key.
 
 ### macOS Keychain Storage (Recommended on macOS)
 
-On macOS, store the controller private key in the system Keychain instead of a plaintext JSON file. The key is retrieved in memory only for signing and never written to disk.
+On macOS, store the controller private key in the system Keychain instead of a plaintext JSON file. **This is the recommended approach** — the key is retrieved in memory only for signing and never written to disk.
 
 **Store the key:**
 ```bash
@@ -51,7 +51,6 @@ security add-generic-password \
   -l "UP Controller Key" \
   -D "Ethereum Private Key" \
   -w "<private-key>" \
-  -T /usr/bin/security \
   -U
 ```
 
@@ -74,10 +73,17 @@ privateKey = null; // Clear from memory
 ```
 
 **Notes:**
-- `-T /usr/bin/security` grants the `security` CLI access without a GUI prompt
+- macOS will show a system prompt the first time an app accesses the key — this is expected and provides user oversight
 - Apple's Secure Enclave does not support secp256k1 (Ethereum's curve), so the key must be extracted for signing — but it stays in memory only, never on disk
 - After storing in Keychain, delete the JSON credentials file
 - **This approach is macOS-only.** On Linux, consider using a secrets manager, encrypted keyring, or environment variables instead
+
+### ⚠️ JSON Key File (Less Secure)
+
+If you use the JSON key file (`~/.openclaw/credentials/universal-profile-key.json`), be aware:
+- The private key is stored on disk (even if the format is obfuscated)
+- Ensure the file has restricted permissions: `chmod 600 ~/.openclaw/credentials/universal-profile-key.json`
+- Prefer Keychain storage on macOS whenever possible
 
 ## Transactions
 
@@ -296,12 +302,28 @@ await fetch('https://relayer.mainnet.lukso.network/api/execute', {
 
 ## Security
 
+### Permission Best Practices
 - Grant minimum permissions. Prefer CALL over SUPER_CALL.
 - Use AllowedCalls/AllowedERC725YDataKeys to restrict access.
 - Avoid DELEGATECALL and CHANGEOWNER unless absolutely necessary.
 - Use validity timestamps for relay calls.
 - Test on testnet (chain 4201) first.
 - Never log private keys.
+
+### Key Management
+- **Recommended (macOS):** Store private keys in macOS Keychain (see Credentials section above)
+- **JSON key files:** If used, restrict permissions (`chmod 600`) and consider migrating to Keychain
+- Private keys are only loaded into memory for signing, then cleared
+- The `config set` command is restricted to safe keys only — `keystorePath` and `profiles` cannot be modified at runtime to prevent path redirection attacks
+
+### Network Access
+This skill only communicates with known LUKSO ecosystem endpoints:
+- **RPC:** `https://42.rpc.thirdweb.com` (mainnet), `https://rpc.testnet.lukso.network` (testnet)
+- **Relay:** `https://relayer.mainnet.lukso.network/api` (gasless transactions)
+- **IPFS:** `https://api.universalprofile.cloud/ipfs/` (metadata), `https://www.forevermoments.life/api/pinata` (pinning)
+- **Forever Moments API:** `https://www.forevermoments.life/api/agent/v1` (NFT minting)
+
+No other external network calls are made. All transaction signing happens locally.
 
 ## Forever Moments (NFT Moments & Collections)
 

@@ -106,12 +106,30 @@ export async function saveConfig(config) {
 }
 
 /**
+ * Allowed top-level config keys that can be modified via `config set`.
+ * Restricting this prevents abuse (e.g. redirecting keystorePath).
+ */
+const ALLOWED_CONFIG_KEYS = new Set([
+  'defaultChain',
+]);
+
+/**
  * Update a specific configuration value
  * @param {string} key - Configuration key (supports dot notation)
  * @param {*} value - Value to set
  * @returns {Promise<Object>} Updated configuration
  */
 export async function setConfigValue(key, value) {
+  // Security: only allow known safe keys to be modified
+  const topKey = key.split('.')[0];
+  if (!ALLOWED_CONFIG_KEYS.has(topKey)) {
+    throw new Error(
+      `Cannot modify "${key}" via config set. ` +
+      `Allowed keys: ${[...ALLOWED_CONFIG_KEYS].join(', ')}. ` +
+      `Sensitive paths (keystorePath, profiles) must be set during initial setup.`
+    );
+  }
+
   const config = await loadConfig();
   
   // Support dot notation (e.g., "chains.lukso.rpcUrl")

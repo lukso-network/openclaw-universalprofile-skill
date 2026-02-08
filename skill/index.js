@@ -490,9 +490,9 @@ const commands = {
     
     if (positional.length < 2) {
       console.log('Usage: up config set <key> <value>');
-      console.log('\nKeys:');
+      console.log('\nAllowed keys:');
       console.log('  defaultChain - Default chain (lukso, lukso-testnet)');
-      console.log('  keystorePath - Path to encrypted keystore');
+      console.log('\nNote: keystorePath and profiles cannot be changed at runtime for security.');
       return null;
     }
     
