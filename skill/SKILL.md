@@ -177,6 +177,7 @@ Permissions are a bytes32 BitArray at `AddressPermissions:Permissions:<address>`
 | LSP7 (`0xc52d6008`) | DigitalAsset | Fungible tokens (like ERC20) |
 | LSP8 (`0x3a271706`) | IdentifiableDigitalAsset | NFTs (bytes32 token IDs) |
 | LSP9 (`0x28af17e6`) | Vault | Sub-account for asset segregation |
+| LSP28 | The Grid | Customizable profile grid layouts |
 | LSP14 (`0x94be5999`) | Ownable2Step | Two-step ownership transfer |
 | LSP25 (`0x5ac79908`) | ExecuteRelayCall | Gasless meta-transactions |
 | LSP26 (`0x2b299cea`) | FollowerSystem | On-chain follow/unfollow |
@@ -207,6 +208,61 @@ const url = Buffer.from(hex.slice(80), 'hex').toString('utf8');
 **⚠️ Common mistake:** Forgetting the `0020` hash length bytes between the hash function selector and the actual hash. Without it, the URL offset is wrong and parsers will read garbage.
 
 **LSP3Profile data key:** `0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5`
+
+**LSP28TheGrid data key:** `0x724141d9918ce69e6b8afcf53a91748466086ba2c74b94cab43c649ae2ac23ff`
+
+## LSP28 — The Grid
+
+Customizable grid layouts for profiles/tokens. Stored as VerifiableURI at the LSP28 data key.
+
+```json
+{
+  "LSP28TheGrid": [{
+    "title": "My Grid",
+    "gridColumns": 2,
+    "visibility": "public",
+    "grid": [
+      { "width": 1, "height": 1, "type": "IFRAME", "properties": { "src": "https://..." } },
+      { "width": 1, "height": 1, "type": "TEXT", "properties": { "title": "Hello", "text": "World", "backgroundColor": "#1a1a2e", "textColor": "#fff", "link": "https://..." } },
+      { "width": 2, "height": 2, "type": "IMAGES", "properties": { "type": "grid", "images": ["https://..."] } },
+      { "width": 1, "height": 1, "type": "X", "properties": { "type": "post", "username": "handle", "id": "tweetId", "theme": "dark" } }
+    ]
+  }]
+}
+```
+
+**Grid types:** `IFRAME`, `TEXT`, `IMAGES`, `X` (Twitter embed), `INSTAGRAM`, `QR_CODE`, `ELFSIGHT` (custom widget).
+**Recommended:** `gridColumns` 2–4, `width`/`height` 1–3.
+
+## setData via Gasless Relay (Direct Pattern)
+
+For setting ERC725Y data (LSP3 profile, LSP28 grid, custom keys) via relay — use `setData` payload directly (do NOT wrap in `execute`):
+
+```javascript
+// 1. Build setData payload
+const iface = new ethers.Interface(['function setData(bytes32 dataKey, bytes dataValue)']);
+const payload = iface.encodeFunctionData('setData', [dataKey, verifiableURI]);
+
+// 2. Get nonce from KeyManager
+const km = new ethers.Contract(KM_ADDRESS, ['function getNonce(address,uint128) view returns (uint256)'], provider);
+const nonce = await km.getNonce(controllerAddress, 0);
+
+// 3. LSP25 signature
+const encoded = ethers.solidityPacked(
+  ['uint256','uint256','uint256','uint256','uint256','bytes'],
+  [25, chainId, nonce, '0x' + '00'.repeat(32), 0, payload]
+);
+const msg = new Uint8Array([0x19, 0x00, ...ethers.getBytes(KM_ADDRESS), ...ethers.getBytes(encoded)]);
+const signature = ethers.Signature.from(new ethers.SigningKey(privateKey).sign(ethers.keccak256(msg))).serialized;
+
+// 4. Submit to relay
+await fetch('https://relayer.mainnet.lukso.network/api/execute', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ address: UP, transaction: { abi: payload, signature, nonce: Number(nonce), validityTimestamps: '0x0' } })
+});
+```
+
+**⚠️ Key distinction:** `setData` payload goes directly to the KeyManager — do NOT wrap it in `execute(CALL, self, setData(...))`. The KeyManager forwards calls to the UP automatically. Only use `execute()` wrapper for operations targeting *other* contracts.
 
 ## Network Config
 
