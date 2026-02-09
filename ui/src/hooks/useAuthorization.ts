@@ -88,6 +88,37 @@ export function useAuthorization(
     }
   }, [publicClient, upAddress])
 
+  // Find an empty slot in the AddressPermissions[] array
+  // Returns the index of an empty slot (0x0000...0000 address), or null if none found
+  const findEmptySlot = useCallback(async (arrayLength: number): Promise<number | null> => {
+    if (!publicClient || !upAddress || arrayLength === 0) return null
+
+    try {
+      // Read all array elements to find empty slots
+      const emptyAddress = '0x0000000000000000000000000000000000000000'
+
+      for (let i = 0; i < arrayLength; i++) {
+        const indexKey = `${DATA_KEYS['AddressPermissions[]_index_prefix']}${i.toString(16).padStart(32, '0')}` as Hex
+        const addressData = await publicClient.readContract({
+          address: upAddress,
+          abi: LSP0_ABI,
+          functionName: 'getData',
+          args: [indexKey],
+        }) as Hex
+
+        // Check if this slot is empty (0x or 0x0000...0000)
+        if (!addressData || addressData === '0x' || addressData.toLowerCase() === emptyAddress.toLowerCase()) {
+          return i
+        }
+      }
+
+      return null // No empty slots found
+    } catch (err) {
+      console.error('Error finding empty slot:', err)
+      return null
+    }
+  }, [publicClient, upAddress])
+
   // Authorize a new controller
   const authorize = useCallback(async (params: AuthorizationParams) => {
     if (!walletClient || !publicClient || !upAddress) {
@@ -106,13 +137,20 @@ export function useAuthorization(
       const existing = await checkExistingController(params.controllerAddress)
       const isExistingController = existing.exists
 
-      // Get current controllers count (only needed for new controllers)
-      const currentLength = isExistingController ? 0 : await getControllersCount()
+      // Get current controllers count and find empty slot (only needed for new controllers)
+      let currentLength = 0
+      let emptySlotIndex: number | null = null
+
+      if (!isExistingController) {
+        currentLength = await getControllersCount()
+        // Check for empty slots in the array before appending
+        emptySlotIndex = await findEmptySlot(currentLength)
+      }
 
       // Build data keys and values
       const permissionsHex = combinePermissions([params.permissions])
-      const allowedCallsHex = params.allowedCalls 
-        ? encodeAllowedCalls(params.allowedCalls) 
+      const allowedCallsHex = params.allowedCalls
+        ? encodeAllowedCalls(params.allowedCalls)
         : undefined
       const allowedDataKeysHex = params.allowedDataKeys
         ? encodeAllowedDataKeys(params.allowedDataKeys)
@@ -124,7 +162,8 @@ export function useAuthorization(
         currentLength,
         allowedCallsHex,
         allowedDataKeysHex,
-        isExistingController // Skip array operations if controller already exists
+        isExistingController, // Skip array operations if controller already exists
+        emptySlotIndex // Use empty slot if available, otherwise append to end
       )
 
       console.log('Authorization data:', {
@@ -189,5 +228,6 @@ export function useAuthorization(
     authorize,
     reset,
     checkExistingController,
+    findEmptySlot,
   }
 }

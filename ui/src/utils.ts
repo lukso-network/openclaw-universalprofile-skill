@@ -82,6 +82,7 @@ export function getArrayIndexDataKey(index: number): Hex {
 /**
  * Build the data keys and values for adding a new controller or updating an existing one
  * @param isExisting - If true, skip adding to the array (controller already exists)
+ * @param emptySlotIndex - If provided and controller is new, use this empty slot instead of appending
  */
 export function buildControllerData(
   controllerAddress: Address,
@@ -89,20 +90,29 @@ export function buildControllerData(
   currentLength: number,
   allowedCalls?: Hex,
   allowedDataKeys?: Hex,
-  isExisting: boolean = false
+  isExisting: boolean = false,
+  emptySlotIndex: number | null = null
 ): { dataKeys: Hex[]; dataValues: Hex[] } {
   const dataKeys: Hex[] = []
   const dataValues: Hex[] = []
 
   // Only add to array if this is a new controller
   if (!isExisting) {
-    // 1. Update array length
-    dataKeys.push(DATA_KEYS['AddressPermissions[]'] as Hex)
-    dataValues.push(pad(toHex(currentLength + 1), { size: 16 }))
+    if (emptySlotIndex !== null) {
+      // Use the empty slot - no need to update array length
+      // Just set the controller address at the empty slot index
+      dataKeys.push(getArrayIndexDataKey(emptySlotIndex))
+      dataValues.push(pad(controllerAddress, { size: 20 }))
+    } else {
+      // No empty slot found - append to end
+      // 1. Update array length
+      dataKeys.push(DATA_KEYS['AddressPermissions[]'] as Hex)
+      dataValues.push(pad(toHex(currentLength + 1), { size: 16 }))
 
-    // 2. Add controller address to array at new index
-    dataKeys.push(getArrayIndexDataKey(currentLength))
-    dataValues.push(pad(controllerAddress, { size: 20 }))
+      // 2. Add controller address to array at new index
+      dataKeys.push(getArrayIndexDataKey(currentLength))
+      dataValues.push(pad(controllerAddress, { size: 20 }))
+    }
   }
 
   // 3. Set permissions for controller (always do this)
