@@ -207,6 +207,7 @@ export interface DataKeyPreset {
   key: string
   description: string
   group: string
+  keyType: 'Singleton' | 'Mapping' | 'Array'
 }
 
 export const DATA_KEY_PRESETS: Record<string, DataKeyPreset> = {
@@ -215,42 +216,49 @@ export const DATA_KEY_PRESETS: Record<string, DataKeyPreset> = {
     key: '0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5',
     description: 'Profile metadata (name, description, avatar, etc.)',
     group: 'Profile',
+    keyType: 'Singleton',
   },
   'LSP5ReceivedAssets[]': {
     name: 'LSP5ReceivedAssets[]',
     key: '0x6460ee3c0aac563ccbf76d6e1d07bada78e3a9514e6382b736ed3f478ab7b90b',
     description: 'Received assets array length',
     group: 'Assets',
+    keyType: 'Array',
   },
   LSP5ReceivedAssetsMap: {
-    name: 'LSP5ReceivedAssetsMap (all)',
+    name: 'LSP5ReceivedAssetsMap',
     key: '0x812c4334633eb816c80d0000',
-    description: 'All received asset mapping entries (prefix)',
+    description: 'Received asset mapping entries',
     group: 'Assets',
+    keyType: 'Mapping',
   },
   'LSP12IssuedAssets[]': {
     name: 'LSP12IssuedAssets[]',
     key: '0x7c8c3416d6cda87cd42c71ea1843df28ac4850354f988d55ee2eaa47b6dc05cd',
     description: 'Issued assets array length',
     group: 'Assets',
+    keyType: 'Array',
   },
   LSP12IssuedAssetsMap: {
-    name: 'LSP12IssuedAssetsMap (all)',
+    name: 'LSP12IssuedAssetsMap',
     key: '0x74ac2555c10b9349e78f0000',
-    description: 'All issued asset mapping entries (prefix)',
+    description: 'Issued asset mapping entries',
     group: 'Assets',
+    keyType: 'Mapping',
   },
   LSP1UniversalReceiverDelegate: {
     name: 'LSP1 Universal Receiver Delegate',
     key: '0x0cfc51aec37c55a4d0b1a65c6255c4bf2fbdf6277f3cc0730c45b828b6db8b47',
     description: 'Universal Receiver Delegate address',
     group: 'Advanced',
+    keyType: 'Singleton',
   },
   LSP17Extension: {
-    name: 'LSP17 Extensions (all)',
+    name: 'LSP17 Extensions',
     key: '0xcee78b4094da860110960000',
-    description: 'All contract extension mappings (prefix)',
+    description: 'Contract extension mappings',
     group: 'Advanced',
+    keyType: 'Mapping',
   },
 }
 

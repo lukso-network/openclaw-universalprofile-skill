@@ -3,6 +3,7 @@ import {
   toHex, 
   pad,
   toFunctionSelector,
+  keccak256,
   type Hex,
   type Address
 } from 'viem'
@@ -361,4 +362,18 @@ export function findMatchingPreset(permissions: bigint): string | null {
 export function parsePermissionsHex(hex: Hex | string): bigint {
   if (!hex || hex === '0x') return 0n
   return BigInt(hex)
+}
+
+/**
+ * Build a full 32-byte LSP2 Mapping key from a 12-byte prefix and an address.
+ * Full key = first10bytes(keyName hash) + 0000 + last20bytes(keccak256(address))
+ * The prefix already contains the first 12 bytes (10 bytes of key name hash + 2 zero bytes).
+ */
+export function buildMappingKey(prefix: string, address: string): Hex {
+  // prefix is 12 bytes = "0x" + 24 hex chars
+  const prefixClean = prefix.toLowerCase()
+  // Hash the address and take last 20 bytes (40 hex chars)
+  const addressHash = keccak256(address.toLowerCase() as Hex)
+  const last20Bytes = addressHash.slice(-40)
+  return `${prefixClean}${last20Bytes}` as Hex
 }

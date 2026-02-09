@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { DATA_KEY_PRESETS } from '../constants'
+import { buildMappingKey } from '../utils'
 import type { DataKeyEntry } from '../utils'
 
 interface AllowedDataKeysEditorProps {
@@ -10,18 +11,76 @@ interface AllowedDataKeysEditorProps {
 export function AllowedDataKeysEditor({ entries, onChange }: AllowedDataKeysEditorProps) {
   const [customKeyInput, setCustomKeyInput] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
+  // Track which mapping preset has its popover open
+  const [openMappingPopover, setOpenMappingPopover] = useState<string | null>(null)
+  // Track which mapping preset is in "specific address" input mode
+  const [specificAddressInput, setSpecificAddressInput] = useState<string | null>(null)
+  const [addressValue, setAddressValue] = useState('')
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  // Close popover on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setOpenMappingPopover(null)
+        setSpecificAddressInput(null)
+        setAddressValue('')
+      }
+    }
+    if (openMappingPopover || specificAddressInput) {
+      document.addEventListener('mousedown', handleClick)
+      return () => document.removeEventListener('mousedown', handleClick)
+    }
+  }, [openMappingPopover, specificAddressInput])
 
   const addPreset = (presetKey: string) => {
     const preset = DATA_KEY_PRESETS[presetKey]
     if (!preset) return
-    // Don't add duplicates
     if (entries.some(e => e.key === preset.key)) return
     onChange([...entries, {
       id: crypto.randomUUID(),
-      name: preset.name,
+      name: preset.keyType === 'Mapping' ? `${preset.name} (all)` : preset.name,
       key: preset.key,
       isPreset: true,
     }])
+  }
+
+  const addMappingSpecific = (presetKey: string) => {
+    const preset = DATA_KEY_PRESETS[presetKey]
+    if (!preset) return
+    const trimmed = addressValue.trim()
+    if (!/^0x[a-fA-F0-9]{40}$/.test(trimmed)) return
+    const fullKey = buildMappingKey(preset.key, trimmed)
+    if (entries.some(e => e.key === fullKey)) return
+    const shortAddr = `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`
+    onChange([...entries, {
+      id: crypto.randomUUID(),
+      name: `${preset.name} (${shortAddr})`,
+      key: fullKey,
+      isPreset: true,
+    }])
+    setSpecificAddressInput(null)
+    setOpenMappingPopover(null)
+    setAddressValue('')
+  }
+
+  const handlePresetClick = (presetKey: string) => {
+    const preset = DATA_KEY_PRESETS[presetKey]
+    if (!preset) return
+    if (preset.keyType === 'Mapping') {
+      // Toggle popover for mapping keys
+      if (openMappingPopover === presetKey) {
+        setOpenMappingPopover(null)
+        setSpecificAddressInput(null)
+        setAddressValue('')
+      } else {
+        setOpenMappingPopover(presetKey)
+        setSpecificAddressInput(null)
+        setAddressValue('')
+      }
+    } else {
+      addPreset(presetKey)
+    }
   }
 
   const addCustomKey = () => {
@@ -54,7 +113,9 @@ export function AllowedDataKeysEditor({ entries, onChange }: AllowedDataKeysEdit
 
   const isPresetAdded = (presetKey: string) => {
     const preset = DATA_KEY_PRESETS[presetKey]
-    return preset ? entries.some(e => e.key === preset.key) : false
+    if (!preset) return false
+    // For mapping keys, check if the prefix (all) version is added
+    return entries.some(e => e.key === preset.key)
   }
 
   return (
@@ -79,23 +140,101 @@ export function AllowedDataKeysEditor({ entries, onChange }: AllowedDataKeysEdit
             <div className="flex flex-wrap gap-1.5">
               {presets.map(({ key, preset }) => {
                 const added = isPresetAdded(key)
+                const isMappingOpen = openMappingPopover === key
                 return (
-                  <button
-                    key={key}
-                    onClick={() => !added && addPreset(key)}
-                    disabled={added}
-                    className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${
-                      added
-                        ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 cursor-default'
-                        : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-lukso-pink hover:text-lukso-pink hover:bg-lukso-pink/5'
-                    }`}
-                    title={preset.description}
-                  >
-                    {added && (
-                      <span className="mr-1">✓</span>
+                  <div key={key} className="relative">
+                    <button
+                      onClick={() => !added && handlePresetClick(key)}
+                      disabled={added}
+                      className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${
+                        added
+                          ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 cursor-default'
+                          : isMappingOpen
+                            ? 'border-lukso-pink bg-lukso-pink/5 text-lukso-pink ring-1 ring-lukso-pink/30'
+                            : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-lukso-pink hover:text-lukso-pink hover:bg-lukso-pink/5'
+                      }`}
+                      title={preset.description}
+                    >
+                      {added && <span className="mr-1">✓</span>}
+                      {preset.name}
+                      {preset.keyType === 'Mapping' && !added && (
+                        <span className="ml-1 opacity-60">▾</span>
+                      )}
+                    </button>
+
+                    {/* Mapping popover */}
+                    {isMappingOpen && (
+                      <div
+                        ref={popoverRef}
+                        className="absolute top-full left-0 mt-1 z-20 w-72 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg"
+                      >
+                        {specificAddressInput === key ? (
+                          /* Specific address input mode */
+                          <div className="space-y-2">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Enter the address for {preset.name}:
+                            </p>
+                            <input
+                              type="text"
+                              value={addressValue}
+                              onChange={(e) => setAddressValue(e.target.value)}
+                              placeholder="0x... (20-byte address)"
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-xs font-mono focus:ring-2 focus:ring-lukso-pink focus:border-transparent"
+                              onKeyDown={(e) => e.key === 'Enter' && addMappingSpecific(key)}
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => addMappingSpecific(key)}
+                                disabled={!/^0x[a-fA-F0-9]{40}$/.test(addressValue.trim())}
+                                className="flex-1 px-2 py-1.5 rounded-lg bg-lukso-pink text-white text-xs font-medium hover:bg-lukso-pink/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                              >
+                                Add Specific Key
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSpecificAddressInput(null)
+                                  setAddressValue('')
+                                }}
+                                className="px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
+                              >
+                                Back
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Choice: all or specific */
+                          <div className="space-y-1.5">
+                            <button
+                              onClick={() => {
+                                addPreset(key)
+                                setOpenMappingPopover(null)
+                              }}
+                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all group"
+                            >
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-lukso-pink">
+                                All <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(prefix)</span>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                Allow writing to any {preset.name} entry
+                              </p>
+                            </button>
+                            <button
+                              onClick={() => setSpecificAddressInput(key)}
+                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all group"
+                            >
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-lukso-pink">
+                                Specific <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(address)</span>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                Restrict to a specific mapped address
+                              </p>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
-                    {preset.name}
-                  </button>
+                  </div>
                 )
               })}
             </div>
