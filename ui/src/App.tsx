@@ -6,14 +6,18 @@ import {
   ConnectionSection,
   ControllerInfo,
   PermissionSelector,
+  AllowedCallsEditor,
+  AllowedDataKeysEditor,
   RiskWarnings,
   AuthorizeButton,
   SuccessConfirmation,
 } from './components'
 import { useWallet } from './hooks/useWallet'
 import { useAuthorization } from './hooks/useAuthorization'
-import { parseUrlParams, findMatchingPreset, decodePermissions } from './utils'
-import { PERMISSION_PRESETS, PERMISSION_NAMES } from './constants'
+import { parseUrlParams, findMatchingPreset, decodePermissions, convertEntriesToAllowedCalls } from './utils'
+import type { AllowedCallEntry, DataKeyEntry } from './utils'
+import { PERMISSION_PRESETS, PERMISSION_NAMES, PERMISSIONS } from './constants'
+import type { Hex } from 'viem'
 
 function App() {
   // Parse URL parameters
@@ -40,6 +44,10 @@ function App() {
     wallet.walletClient,
     wallet.publicClient
   )
+  
+  // AllowedCalls and AllowedDataKeys state
+  const [allowedCallEntries, setAllowedCallEntries] = useState<AllowedCallEntry[]>([])
+  const [allowedDataKeyEntries, setAllowedDataKeyEntries] = useState<DataKeyEntry[]>([])
   
   // Error state
   const [error, setError] = useState<string | null>(null)
@@ -89,6 +97,48 @@ function App() {
     checkController()
   }, [wallet.isConnected, wallet.address, controllerAddress, authorization])
 
+  // SUPER permission interaction logic
+  const hasSuperCall = (permissions & BigInt(PERMISSIONS.SUPER_CALL)) !== 0n
+  const hasSuperSetData = (permissions & BigInt(PERMISSIONS.SUPER_SETDATA)) !== 0n
+  const hasCallRelated = (permissions & (
+    BigInt(PERMISSIONS.CALL) | BigInt(PERMISSIONS.STATICCALL) |
+    BigInt(PERMISSIONS.DELEGATECALL) | BigInt(PERMISSIONS.TRANSFERVALUE)
+  )) !== 0n
+  const hasSetData = (permissions & BigInt(PERMISSIONS.SETDATA)) !== 0n
+
+  const showAllowedCalls = !hasSuperCall && hasCallRelated
+  const showAllowedDataKeys = !hasSuperSetData && hasSetData
+
+  // When AllowedCalls entries change: auto-untick SUPER_CALL, ensure CALL is on
+  const handleAllowedCallsChange = useCallback((entries: AllowedCallEntry[]) => {
+    setAllowedCallEntries(entries)
+    if (entries.length > 0) {
+      setPermissions(prev => {
+        let newPerms = prev
+        // Remove SUPER_CALL
+        newPerms = newPerms & ~BigInt(PERMISSIONS.SUPER_CALL)
+        // Ensure CALL is set
+        newPerms = newPerms | BigInt(PERMISSIONS.CALL)
+        return newPerms
+      })
+    }
+  }, [])
+
+  // When AllowedDataKeys entries change: auto-untick SUPER_SETDATA, ensure SETDATA is on
+  const handleAllowedDataKeysChange = useCallback((entries: DataKeyEntry[]) => {
+    setAllowedDataKeyEntries(entries)
+    if (entries.length > 0) {
+      setPermissions(prev => {
+        let newPerms = prev
+        // Remove SUPER_SETDATA
+        newPerms = newPerms & ~BigInt(PERMISSIONS.SUPER_SETDATA)
+        // Ensure SETDATA is set
+        newPerms = newPerms | BigInt(PERMISSIONS.SETDATA)
+        return newPerms
+      })
+    }
+  }, [])
+
   // Handle authorization
   const handleAuthorize = useCallback(async () => {
     if (!controllerAddress) {
@@ -103,11 +153,22 @@ function App() {
     }
     
     setError(null)
+    
+    // Convert UI entries to encoded data
+    const allowedCalls = allowedCallEntries.length > 0
+      ? convertEntriesToAllowedCalls(allowedCallEntries)
+      : undefined
+    const allowedDataKeys = allowedDataKeyEntries.length > 0
+      ? allowedDataKeyEntries.map(e => e.key as Hex)
+      : undefined
+    
     await authorization.authorize({
       controllerAddress,
       permissions,
+      allowedCalls,
+      allowedDataKeys,
     })
-  }, [controllerAddress, permissions, authorization, existingPermissions])
+  }, [controllerAddress, permissions, authorization, existingPermissions, allowedCallEntries, allowedDataKeyEntries])
 
   // Handle success modal close
   const handleSuccessClose = useCallback(() => {
@@ -173,6 +234,60 @@ function App() {
               initialPreset={urlParams.preset}
               existingPermissions={existingPermissions}
             />
+          </section>
+        )}
+
+        {/* Allowed Calls */}
+        {wallet.isConnected && controllerAddress && permissions > 0n && (
+          <section>
+            {hasSuperCall && hasCallRelated && (
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <div>
+                    <h4 className="font-medium text-purple-700 dark:text-purple-400">SUPER_CALL Active</h4>
+                    <p className="text-sm text-purple-600 dark:text-purple-300 mt-1">
+                      AllowedCalls restrictions are bypassed — this controller can call any contract without restrictions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {showAllowedCalls && (
+              <AllowedCallsEditor
+                entries={allowedCallEntries}
+                onChange={handleAllowedCallsChange}
+              />
+            )}
+          </section>
+        )}
+
+        {/* Allowed Data Keys */}
+        {wallet.isConnected && controllerAddress && permissions > 0n && (
+          <section>
+            {hasSuperSetData && hasSetData && (
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <div>
+                    <h4 className="font-medium text-purple-700 dark:text-purple-400">SUPER_SETDATA Active</h4>
+                    <p className="text-sm text-purple-600 dark:text-purple-300 mt-1">
+                      Data key restrictions are bypassed — this controller can write to any ERC725Y data key without restrictions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {showAllowedDataKeys && (
+              <AllowedDataKeysEditor
+                entries={allowedDataKeyEntries}
+                onChange={handleAllowedDataKeysChange}
+              />
+            )}
           </section>
         )}
 

@@ -2,6 +2,7 @@ import { DATA_KEYS, PERMISSIONS, PERMISSION_RISK, PERMISSION_PRESETS } from './c
 import { 
   toHex, 
   pad,
+  toFunctionSelector,
   type Hex,
   type Address
 } from 'viem'
@@ -136,17 +137,19 @@ export interface AllowedCall {
 export function encodeAllowedCalls(calls: AllowedCall[]): Hex {
   if (calls.length === 0) return '0x' as Hex
 
-  // Each allowed call is 32 bytes:
+  // CompactBytesArray format: each entry is 2-byte length prefix (0x0020 = 32) + 32 bytes data
+  // Each allowed call entry is 32 bytes:
   // - 4 bytes: call types (left-padded)
   // - 20 bytes: address
   // - 4 bytes: interface ID
   // - 4 bytes: function selector
   const encoded = calls.map(call => {
-    const callTypes = pad(toHex(call.callTypes), { size: 4 })
+    const callTypes = pad(toHex(call.callTypes), { size: 4 }).slice(2)
     const address = call.address.toLowerCase().slice(2)
-    const interfaceId = call.interfaceId.slice(2)
-    const functionSelector = call.functionSelector.slice(2)
-    return `${callTypes}${address}${interfaceId}${functionSelector}`
+    const interfaceId = call.interfaceId.slice(2).padStart(8, '0')
+    const functionSelector = call.functionSelector.slice(2).padStart(8, '0')
+    // CompactBytesArray: 0x0020 prefix (32 bytes length) + 32 bytes data
+    return `0020${callTypes}${address}${interfaceId}${functionSelector}`
   }).join('')
 
   return `0x${encoded}` as Hex
@@ -167,6 +170,74 @@ export function encodeAllowedDataKeys(dataKeyPrefixes: Hex[]): Hex {
   })
 
   return `0x${parts.join('')}` as Hex
+}
+
+/**
+ * AllowedCallEntry — UI state model for a single AllowedCalls entry
+ */
+export interface AllowedCallEntry {
+  id: string
+  callTypes: { call: boolean; staticCall: boolean; delegateCall: boolean }
+  address: string
+  useAnyAddress: boolean
+  interfaceId: string
+  useAnyInterface: boolean
+  functionInput: string
+  useAnyFunction: boolean
+}
+
+/**
+ * DataKeyEntry — UI state model for a single AllowedERC725YDataKeys entry
+ */
+export interface DataKeyEntry {
+  id: string
+  name: string
+  key: string
+  isPreset: boolean
+}
+
+/**
+ * Compute a function selector from hex or human-readable signature
+ */
+export function computeSelector(input: string): Hex | null {
+  if (!input || input.trim() === '') return null
+  const trimmed = input.trim()
+  // Already a 4-byte hex selector
+  if (/^0x[a-fA-F0-9]{8}$/.test(trimmed)) {
+    return trimmed.toLowerCase() as Hex
+  }
+  // Try to parse as function signature
+  try {
+    return toFunctionSelector(trimmed)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Convert UI AllowedCallEntry[] to AllowedCall[] for encoding
+ */
+export function convertEntriesToAllowedCalls(entries: AllowedCallEntry[]): AllowedCall[] {
+  return entries.map(entry => {
+    let callTypeBitmap = 0
+    if (entry.callTypes.call) callTypeBitmap |= 1
+    if (entry.callTypes.staticCall) callTypeBitmap |= 2
+    if (entry.callTypes.delegateCall) callTypeBitmap |= 4
+
+    const address = entry.useAnyAddress
+      ? '0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF' as Address
+      : entry.address as Address
+
+    const interfaceId = entry.useAnyInterface
+      ? '0xFFFFFFFF' as Hex
+      : (entry.interfaceId || '0xFFFFFFFF') as Hex
+
+    const selector = entry.useAnyFunction
+      ? '0xFFFFFFFF' as Hex
+      : (computeSelector(entry.functionInput) || '0xFFFFFFFF') as Hex
+
+    return { callTypes: callTypeBitmap, address, interfaceId, functionSelector: selector }
+  })
 }
 
 /**
