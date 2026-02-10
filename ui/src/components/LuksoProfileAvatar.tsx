@@ -40,6 +40,7 @@ const sizeMap: Record<string, LuksoSize> = {
  * 
  * Handles:
  * - Client-side only loading (web components)
+ * - IPFS URL → HTTP gateway conversion
  * - Size mapping
  * - Identicon display with profile pictures
  */

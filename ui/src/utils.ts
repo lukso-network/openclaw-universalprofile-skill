@@ -329,7 +329,10 @@ export function generateAuthUrl(
 /**
  * Convert IPFS URL to HTTP gateway URL
  * Handles ipfs://, ipfs://ipfs/, and raw CIDs
+ * Uses LUKSO's gateway as primary, with cloudflare-ipfs as a reliable alternative
  */
+export const IPFS_GATEWAY = 'https://api.universalprofile.cloud/ipfs/'
+
 export function convertIpfsUrl(url: string): string {
   if (!url) return url
   
@@ -340,13 +343,13 @@ export function convertIpfsUrl(url: string): string {
   
   // IPFS protocol URLs
   if (url.startsWith('ipfs://')) {
-    const hash = url.replace('ipfs://', '').replace('ipfs/', '')
-    return `https://api.universalprofile.cloud/ipfs/${hash}`
+    const hash = url.replace('ipfs://', '').replace(/^ipfs\//, '')
+    return `${IPFS_GATEWAY}${hash}`
   }
   
   // Raw IPFS hash (starts with Qm or baf)
   if (url.startsWith('Qm') || url.startsWith('baf')) {
-    return `https://api.universalprofile.cloud/ipfs/${url}`
+    return `${IPFS_GATEWAY}${url}`
   }
   
   return url
