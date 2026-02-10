@@ -11,7 +11,7 @@ import {
   type Chain
 } from 'viem'
 import { CHAINS, LSP0_ABI, DATA_KEYS } from '../constants'
-import { convertIpfsUrl } from '../utils'
+import { convertIpfsUrl, fetchProfileFromIndexer } from '../utils'
 
 // Type for UP Provider
 interface UPProvider {
@@ -181,60 +181,65 @@ export function useWallet() {
         ? parseInt(lengthData.slice(0, 34), 16) 
         : 0
 
-      // Get profile metadata (LSP3)
-      const profileData = await publicClient.readContract({
-        address,
-        abi: LSP0_ABI,
-        functionName: 'getData',
-        args: [DATA_KEYS['LSP3Profile'] as Hex],
-      }) as Hex
-
       let profileName: string | undefined
       let profileDescription: string | undefined
       let profileImage: string | undefined
 
-      // Parse LSP3 profile data if available
-      if (profileData && profileData !== '0x' && profileData.length > 10) {
-        try {
-          // VerifiableURI format: bytes4(hashFunction) + bytes32(hash) + bytes(url)
-          // = 4 + 32 = 36 bytes = 72 hex chars after 0x prefix
-          const urlHex = profileData.slice(2 + 72) // skip 0x + 36 bytes
-          
-          // Convert hex to string to get the URL
-          const urlBytes = urlHex.match(/.{1,2}/g)
-          if (urlBytes) {
-            let jsonUrl = ''
-            for (const byte of urlBytes) {
-              const charCode = parseInt(byte, 16)
-              if (charCode === 0) break
-              jsonUrl += String.fromCharCode(charCode)
-            }
-            
-            if (jsonUrl) {
-              // Convert IPFS URL to HTTP gateway
-              const httpUrl = convertIpfsUrl(jsonUrl)
+      // Try indexer first (returns pre-resolved HTTP image URLs)
+      try {
+        const indexerProfile = await fetchProfileFromIndexer(address)
+        if (indexerProfile) {
+          profileName = indexerProfile.name || undefined
+          profileImage = indexerProfile.profileImageUrl || undefined
+        }
+      } catch (err) {
+        console.error('Indexer fetch failed, falling back to on-chain:', err)
+      }
+
+      // Fallback: parse LSP3 on-chain data if indexer didn't return an image
+      if (!profileImage) {
+        const profileDataHex = await publicClient.readContract({
+          address,
+          abi: LSP0_ABI,
+          functionName: 'getData',
+          args: [DATA_KEYS['LSP3Profile'] as Hex],
+        }) as Hex
+
+        if (profileDataHex && profileDataHex !== '0x' && profileDataHex.length > 10) {
+          try {
+            const urlHex = profileDataHex.slice(2 + 72)
+            const urlBytes = urlHex.match(/.{1,2}/g)
+            if (urlBytes) {
+              let jsonUrl = ''
+              for (const byte of urlBytes) {
+                const charCode = parseInt(byte, 16)
+                if (charCode === 0) break
+                jsonUrl += String.fromCharCode(charCode)
+              }
               
-              // Fetch the profile JSON
-              const response = await fetch(httpUrl)
-              if (response.ok) {
-                const profileJson = await response.json()
-                profileName = profileJson.LSP3Profile?.name || profileJson.name
-                profileDescription = profileJson.LSP3Profile?.description || profileJson.description
-                
-                // Get profile image and convert IPFS URL
-                const images = profileJson.LSP3Profile?.profileImage || profileJson.profileImage
-                if (images && images.length > 0) {
-                  // Image can be an object {url, width, height, ...} or a string
-                  const imageUrl = typeof images[0] === 'string' ? images[0] : images[0]?.url
-                  if (imageUrl) {
-                    profileImage = convertIpfsUrl(imageUrl)
+              if (jsonUrl) {
+                const httpUrl = convertIpfsUrl(jsonUrl)
+                const response = await fetch(httpUrl)
+                if (response.ok) {
+                  const profileJson = await response.json()
+                  if (!profileName) {
+                    profileName = profileJson.LSP3Profile?.name || profileJson.name
+                  }
+                  profileDescription = profileJson.LSP3Profile?.description || profileJson.description
+                  
+                  const images = profileJson.LSP3Profile?.profileImage || profileJson.profileImage
+                  if (images && images.length > 0) {
+                    const imageUrl = typeof images[0] === 'string' ? images[0] : images[0]?.url
+                    if (imageUrl) {
+                      profileImage = convertIpfsUrl(imageUrl)
+                    }
                   }
                 }
               }
             }
+          } catch (err) {
+            console.error('Error parsing LSP3 profile data:', err)
           }
-        } catch (err) {
-          console.error('Error parsing LSP3 profile data:', err)
         }
       }
 

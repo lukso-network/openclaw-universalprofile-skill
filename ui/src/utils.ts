@@ -356,6 +356,77 @@ export function convertIpfsUrl(url: string): string {
 }
 
 /**
+ * Fetch profile data from LUKSO's Envio indexer.
+ * Returns pre-resolved HTTP URLs for profile images.
+ */
+const LUKSO_INDEXER = 'https://envio.lukso-mainnet.universal.tech/v1/graphql'
+
+export async function fetchProfileFromIndexer(address: string): Promise<{
+  name: string | null
+  profileImageUrl: string | null
+} | null> {
+  const query = `
+    query GetProfile($address: String!) {
+      Profile(where: { id: { _eq: $address } }) {
+        name
+        profileImages(
+          where: { error: { _is_null: true } }
+          order_by: { width: asc }
+        ) {
+          width
+          src
+          url
+        }
+      }
+    }
+  `
+
+  const response = await fetch(LUKSO_INDEXER, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query,
+      variables: { address: address.toLowerCase() },
+    }),
+  })
+
+  if (!response.ok) return null
+
+  const json = await response.json()
+  const profile = json?.data?.Profile?.[0]
+  if (!profile) return null
+
+  // Get best image — prefer ~200px width for medium size
+  let bestImage: string | null = null
+  const images = profile.profileImages || []
+  if (images.length > 0) {
+    // Sort by width, find closest to 200px
+    const sorted = [...images].sort((a: { width: number }, b: { width: number }) => a.width - b.width)
+    let best = sorted[0]
+    let bestDiff = Math.abs(best.width - 200)
+    for (const img of sorted) {
+      const diff = Math.abs(img.width - 200)
+      if (diff < bestDiff) {
+        best = img
+        bestDiff = diff
+      }
+    }
+    // Prefer src (HTTP) over url (IPFS)
+    const rawUrl = best.src || best.url
+    if (rawUrl) {
+      bestImage = rawUrl.startsWith('ipfs://')
+        ? `https://api.universalprofile.cloud/image/${rawUrl.replace('ipfs://', '')}`
+        : rawUrl
+    }
+  }
+
+  return {
+    name: profile.name || null,
+    profileImageUrl: bestImage,
+  }
+}
+
+/**
  * Find a preset that exactly matches the given permissions
  * Returns the preset key if found, null otherwise
  */
