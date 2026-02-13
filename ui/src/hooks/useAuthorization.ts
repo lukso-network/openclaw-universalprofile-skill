@@ -122,10 +122,18 @@ export function useAuthorization(
   // Authorize a new controller
   const authorize = useCallback(async (params: AuthorizationParams) => {
     if (!walletClient || !publicClient || !upAddress) {
+      const detail = {
+        hasWalletClient: !!walletClient,
+        hasPublicClient: !!publicClient,
+        upAddress: upAddress ?? null,
+      }
+      console.error('[useAuthorization] Cannot authorize: wallet not fully ready', detail)
       setState({
         status: 'error',
         txHash: null,
-        error: 'Wallet not connected',
+        error: !walletClient
+          ? 'Wallet client not ready. If you just connected via WalletConnect, please wait a moment and try again.'
+          : 'Wallet not connected',
       })
       return
     }
@@ -198,6 +206,7 @@ export function useAuthorization(
           error: null,
         })
       } else {
+        console.error('[useAuthorization] Transaction failed on-chain', { hash, status: receipt.status })
         setState({
           status: 'error',
           txHash: hash,

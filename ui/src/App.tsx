@@ -142,12 +142,14 @@ function App() {
   // Handle authorization
   const handleAuthorize = useCallback(async () => {
     if (!controllerAddress) {
+      console.error('[App] Authorization attempted without controller address')
       setError('Please enter a controller address')
       return
     }
 
     // Pre-flight check: are permissions identical to what's already on-chain?
     if (existingPermissions !== null && existingPermissions === permissions) {
+      console.warn('[App] No permission changes detected, skipping transaction')
       setError('NO_CHANGES_NEEDED')
       return
     }
@@ -177,8 +179,9 @@ function App() {
   }, [authorization, wallet])
 
   // Is ready to authorize?
-  const isReady = wallet.isConnected && 
-    controllerAddress !== null && 
+  const isReady = wallet.isConnected &&
+    wallet.isWalletClientReady &&
+    controllerAddress !== null &&
     /^0x[a-fA-F0-9]{40}$/.test(controllerAddress) &&
     permissions > 0n
 

@@ -47,7 +47,7 @@ export type ConnectionMethod = 'extension' | 'walletconnect' | null
 export function useWallet() {
   // === WAGMI HOOKS (for WalletConnect) ===
   const wagmiAccount = useAccount()
-  const { data: wagmiWalletClient } = useWagmiWalletClient()
+  const { data: wagmiWalletClient, isLoading: wagmiWalletClientLoading } = useWagmiWalletClient()
   const { disconnect: wagmiDisconnect } = useDisconnect()
 
   // === EXTENSION STATE ===
@@ -136,6 +136,18 @@ export function useWallet() {
     else if (isWcConnected) setConnectionMethod('walletconnect')
     else setConnectionMethod(null)
   }, [extConnected, isWcConnected])
+
+  // === DEBUG: WalletConnect client readiness ===
+  useEffect(() => {
+    if (isWcConnected && !wagmiWalletClient) {
+      console.warn('[useWallet] WalletConnect connected but walletClient not yet available', {
+        wagmiAccountStatus: wagmiAccount.status,
+        wagmiChainId: wagmiAccount.chainId,
+        wagmiAddress: wagmiAccount.address,
+        wagmiWalletClientLoading,
+      })
+    }
+  }, [isWcConnected, wagmiWalletClient, wagmiAccount.status, wagmiAccount.chainId, wagmiAccount.address, wagmiWalletClientLoading])
 
   // === PROFILE FETCHING ===
   const fetchProfileData = useCallback(async (addr: Address, pc: PublicClient) => {
@@ -260,7 +272,9 @@ export function useWallet() {
     const provider = getProvider()
     if (!provider) {
       setExtConnecting(false)
-      setError('No UP Browser Extension detected. Please install the LUKSO UP Extension.')
+      const msg = 'No UP Browser Extension detected. Please install the LUKSO UP Extension.'
+      console.error('[useWallet]', msg)
+      setError(msg)
       return
     }
 
@@ -307,13 +321,17 @@ export function useWallet() {
   // === CONNECT WALLETCONNECT ===
   const connectWalletConnect = useCallback(async () => {
     if (!isWalletConnectConfigured) {
-      setError('WalletConnect is not configured. Set VITE_WALLETCONNECT_PROJECT_ID in your environment.')
+      const msg = 'WalletConnect is not configured. Set VITE_WALLETCONNECT_PROJECT_ID in your environment.'
+      console.error('[useWallet]', msg)
+      setError(msg)
       return
     }
 
     const modal = getAppKitModal()
     if (!modal) {
-      setError('WalletConnect failed to initialize. Please try again.')
+      const msg = 'WalletConnect failed to initialize. Please try again.'
+      console.error('[useWallet]', msg)
+      setError(msg)
       return
     }
 
@@ -401,6 +419,7 @@ export function useWallet() {
     connectionMethod,
     isExtensionAvailable,
     isWalletConnectAvailable: isWalletConnectConfigured,
+    isWalletClientReady: isConnected && walletClient !== null,
     connectExtension,
     connectWalletConnect,
     disconnect,
