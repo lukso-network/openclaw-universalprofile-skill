@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { WalletProvider } from './providers/WalletProvider'
 import './index.css'
 
 // Initialize dark mode based on system preference or saved preference
@@ -15,6 +16,8 @@ initDarkMode()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <WalletProvider>
+      <App />
+    </WalletProvider>
   </React.StrictMode>,
 )

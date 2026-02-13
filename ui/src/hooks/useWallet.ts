@@ -1,17 +1,20 @@
-import { useState, useCallback, useEffect } from 'react'
-import { 
-  createWalletClient, 
-  createPublicClient, 
-  custom, 
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import {
+  createWalletClient,
+  createPublicClient,
+  custom,
   http,
-  type WalletClient, 
+  type WalletClient,
   type PublicClient,
   type Address,
   type Hex,
   type Chain
 } from 'viem'
+import { useAccount, useDisconnect, useWalletClient as useWagmiWalletClient } from 'wagmi'
 import { CHAINS, LSP0_ABI, DATA_KEYS } from '../constants'
 import { convertIpfsUrl, fetchProfileFromIndexer } from '../utils'
+import { isWalletConnectConfigured } from '../lib/walletConfig'
+import { getAppKitModal } from '../providers/WalletProvider'
 
 // Type for UP Provider
 interface UPProvider {
@@ -39,146 +42,121 @@ export interface ProfileData {
   profileImage?: string
 }
 
-export function useWallet() {
-  const [state, setState] = useState<WalletState>({
-    isConnected: false,
-    isConnecting: false,
-    address: null,
-    chainId: null,
-    error: null,
-    walletClient: null,
-    publicClient: null,
-  })
-  const [profileData, setProfileData] = useState<ProfileData | null>(null)
+export type ConnectionMethod = 'extension' | 'walletconnect' | null
 
-  // Get the LUKSO UP Provider
+export function useWallet() {
+  // === WAGMI HOOKS (for WalletConnect) ===
+  const wagmiAccount = useAccount()
+  const { data: wagmiWalletClient } = useWagmiWalletClient()
+  const { disconnect: wagmiDisconnect } = useDisconnect()
+
+  // === EXTENSION STATE ===
+  const [extConnected, setExtConnected] = useState(false)
+  const [extConnecting, setExtConnecting] = useState(false)
+  const [extAddress, setExtAddress] = useState<Address | null>(null)
+  const [extChainId, setExtChainId] = useState<number | null>(null)
+  const [extWalletClient, setExtWalletClient] = useState<WalletClient | null>(null)
+
+  // === SHARED STATE ===
+  const [error, setError] = useState<string | null>(null)
+  const [profileData, setProfileData] = useState<ProfileData | null>(null)
+  const [connectionMethod, setConnectionMethod] = useState<ConnectionMethod>(null)
+
+  // Prevent wagmi auto-reconnect — start disconnected, require explicit connect
+  const manuallyDisconnected = useRef(true)
+
+  // === PROVIDER DETECTION ===
   const getProvider = useCallback((): UPProvider | null => {
     if (typeof window === 'undefined') return null
-    
+
     // Check for UP Browser Extension
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ethereum = (window as any).ethereum
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const lukso = (window as any).lukso
-    
+
     // Prefer lukso provider if available
     if (lukso) return lukso
     if (ethereum) return ethereum
-    
+
     return null
   }, [])
 
-  // Check if UP extension is available
-  const isExtensionAvailable = useCallback((): boolean => {
-    return getProvider() !== null
-  }, [getProvider])
+  const isExtensionAvailable = useMemo(() => getProvider() !== null, [getProvider])
 
-  // Connect wallet
-  const connect = useCallback(async () => {
-    setState(prev => ({ ...prev, isConnecting: true, error: null }))
-    
-    const provider = getProvider()
-    if (!provider) {
-      setState(prev => ({
-        ...prev,
-        isConnecting: false,
-        error: 'No UP Browser Extension detected. Please install the LUKSO UP Extension.',
-      }))
-      return
+  // === HANDLE WAGMI AUTO-RECONNECT ===
+  useEffect(() => {
+    if (wagmiAccount.isConnected && manuallyDisconnected.current) {
+      wagmiDisconnect()
     }
+  }, [wagmiAccount.isConnected, wagmiDisconnect])
 
-    try {
-      // Request accounts
-      const accounts = await provider.request({ method: 'eth_requestAccounts' }) as string[]
-      if (!accounts || accounts.length === 0) {
-        throw new Error('No accounts returned')
-      }
+  // === COMPUTED STATE ===
+  // Extension takes priority if both are connected
+  const isWcConnected = wagmiAccount.isConnected && !manuallyDisconnected.current && !extConnected
+  const isConnected = extConnected || isWcConnected
+  const isConnecting = extConnecting || (wagmiAccount.isConnecting && !extConnected)
 
-      // Get chain ID
-      const chainIdHex = await provider.request({ method: 'eth_chainId' }) as string
-      const chainId = parseInt(chainIdHex, 16)
+  const address = extConnected
+    ? extAddress
+    : isWcConnected
+      ? (wagmiAccount.address ?? null)
+      : null
 
-      // Determine chain config
-      let chain: Chain
-      if (chainId === 42) {
-        chain = CHAINS.lukso as unknown as Chain
-      } else if (chainId === 4201) {
-        chain = CHAINS.luksoTestnet as unknown as Chain
-      } else {
-        // Use LUKSO mainnet as default config but with correct chain ID
-        chain = {
-          ...CHAINS.lukso,
-          id: chainId,
-        } as unknown as Chain
-      }
+  const chainId = extConnected
+    ? extChainId
+    : isWcConnected
+      ? (wagmiAccount.chainId ?? null)
+      : null
 
-      // Create clients
-      const walletClient = createWalletClient({
-        chain,
-        transport: custom(provider),
-      })
-
-      const publicClient = createPublicClient({
-        chain,
-        transport: http(),
-      })
-
-      setState({
-        isConnected: true,
-        isConnecting: false,
-        address: accounts[0] as Address,
-        chainId,
-        error: null,
-        walletClient,
-        publicClient,
-      })
-
-      // Fetch profile data
-      await fetchProfileData(accounts[0] as Address, publicClient)
-    } catch (err) {
-      console.error('Connection error:', err)
-      setState(prev => ({
-        ...prev,
-        isConnecting: false,
-        error: err instanceof Error ? err.message : 'Failed to connect wallet',
-      }))
+  // Public client — always create manually for consistency
+  const publicClient = useMemo(() => {
+    if (!chainId) return null
+    let chain: Chain
+    if (chainId === 42) {
+      chain = CHAINS.lukso as unknown as Chain
+    } else if (chainId === 4201) {
+      chain = CHAINS.luksoTestnet as unknown as Chain
+    } else {
+      chain = { ...CHAINS.lukso, id: chainId } as unknown as Chain
     }
-  }, [getProvider])
+    return createPublicClient({ chain, transport: http() })
+  }, [chainId])
 
-  // Disconnect wallet
-  const disconnect = useCallback(() => {
-    setState({
-      isConnected: false,
-      isConnecting: false,
-      address: null,
-      chainId: null,
-      error: null,
-      walletClient: null,
-      publicClient: null,
-    })
-    setProfileData(null)
-  }, [])
+  // Wallet client — extension uses manual, WC uses wagmi
+  const walletClient = extConnected
+    ? extWalletClient
+    : isWcConnected
+      ? (wagmiWalletClient ?? null)
+      : null
 
-  // Fetch profile data from UP
-  const fetchProfileData = useCallback(async (address: Address, publicClient: PublicClient) => {
+  // === TRACK CONNECTION METHOD ===
+  useEffect(() => {
+    if (extConnected) setConnectionMethod('extension')
+    else if (isWcConnected) setConnectionMethod('walletconnect')
+    else setConnectionMethod(null)
+  }, [extConnected, isWcConnected])
+
+  // === PROFILE FETCHING ===
+  const fetchProfileData = useCallback(async (addr: Address, pc: PublicClient) => {
     try {
       // Get owner
-      const owner = await publicClient.readContract({
-        address,
+      const owner = await pc.readContract({
+        address: addr,
         abi: LSP0_ABI,
         functionName: 'owner',
       }) as Address
 
       // Get controllers count
-      const lengthData = await publicClient.readContract({
-        address,
+      const lengthData = await pc.readContract({
+        address: addr,
         abi: LSP0_ABI,
         functionName: 'getData',
         args: [DATA_KEYS['AddressPermissions[]'] as Hex],
       }) as Hex
 
-      const controllersCount = lengthData && lengthData !== '0x' 
-        ? parseInt(lengthData.slice(0, 34), 16) 
+      const controllersCount = lengthData && lengthData !== '0x'
+        ? parseInt(lengthData.slice(0, 34), 16)
         : 0
 
       let profileName: string | undefined
@@ -187,7 +165,7 @@ export function useWallet() {
 
       // Try indexer first (returns pre-resolved HTTP image URLs)
       try {
-        const indexerProfile = await fetchProfileFromIndexer(address)
+        const indexerProfile = await fetchProfileFromIndexer(addr)
         if (indexerProfile) {
           profileName = indexerProfile.name || undefined
           profileImage = indexerProfile.profileImageUrl || undefined
@@ -198,8 +176,8 @@ export function useWallet() {
 
       // Fallback: parse LSP3 on-chain data if indexer didn't return an image
       if (!profileImage) {
-        const profileDataHex = await publicClient.readContract({
-          address,
+        const profileDataHex = await pc.readContract({
+          address: addr,
           abi: LSP0_ABI,
           functionName: 'getData',
           args: [DATA_KEYS['LSP3Profile'] as Hex],
@@ -216,7 +194,7 @@ export function useWallet() {
                 if (charCode === 0) break
                 jsonUrl += String.fromCharCode(charCode)
               }
-              
+
               if (jsonUrl) {
                 const httpUrl = convertIpfsUrl(jsonUrl)
                 const response = await fetch(httpUrl)
@@ -226,7 +204,7 @@ export function useWallet() {
                     profileName = profileJson.LSP3Profile?.name || profileJson.name
                   }
                   profileDescription = profileJson.LSP3Profile?.description || profileJson.description
-                  
+
                   const images = profileJson.LSP3Profile?.profileImage || profileJson.profileImage
                   if (images && images.length > 0) {
                     const imageUrl = typeof images[0] === 'string' ? images[0] : images[0]?.url
@@ -244,7 +222,7 @@ export function useWallet() {
       }
 
       setProfileData({
-        address,
+        address: addr,
         owner,
         controllersCount,
         profileName,
@@ -256,8 +234,132 @@ export function useWallet() {
     }
   }, [])
 
-  // Listen for account/chain changes
+  // Fetch profile when connection changes
+  const lastFetchKey = useRef<string | null>(null)
   useEffect(() => {
+    const fetchKey = address && publicClient ? `${address}-${publicClient.chain?.id}` : null
+    if (fetchKey && fetchKey !== lastFetchKey.current) {
+      lastFetchKey.current = fetchKey
+      fetchProfileData(address!, publicClient!)
+    } else if (!fetchKey) {
+      lastFetchKey.current = null
+      setProfileData(null)
+    }
+  }, [address, publicClient, fetchProfileData])
+
+  // === CONNECT EXTENSION ===
+  const connectExtension = useCallback(async () => {
+    setExtConnecting(true)
+    setError(null)
+
+    // Disconnect wagmi to avoid conflicts
+    if (wagmiAccount.isConnected) {
+      wagmiDisconnect()
+    }
+
+    const provider = getProvider()
+    if (!provider) {
+      setExtConnecting(false)
+      setError('No UP Browser Extension detected. Please install the LUKSO UP Extension.')
+      return
+    }
+
+    try {
+      // Request accounts
+      const accounts = await provider.request({ method: 'eth_requestAccounts' }) as string[]
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts returned')
+      }
+
+      // Get chain ID
+      const chainIdHex = await provider.request({ method: 'eth_chainId' }) as string
+      const cid = parseInt(chainIdHex, 16)
+
+      // Determine chain config
+      let chain: Chain
+      if (cid === 42) {
+        chain = CHAINS.lukso as unknown as Chain
+      } else if (cid === 4201) {
+        chain = CHAINS.luksoTestnet as unknown as Chain
+      } else {
+        chain = { ...CHAINS.lukso, id: cid } as unknown as Chain
+      }
+
+      // Create wallet client
+      const wc = createWalletClient({
+        chain,
+        transport: custom(provider),
+      })
+
+      setExtConnected(true)
+      setExtConnecting(false)
+      setExtAddress(accounts[0] as Address)
+      setExtChainId(cid)
+      setExtWalletClient(wc)
+      manuallyDisconnected.current = false
+    } catch (err) {
+      console.error('Extension connection error:', err)
+      setExtConnecting(false)
+      setError(err instanceof Error ? err.message : 'Failed to connect wallet')
+    }
+  }, [getProvider, wagmiAccount.isConnected, wagmiDisconnect])
+
+  // === CONNECT WALLETCONNECT ===
+  const connectWalletConnect = useCallback(async () => {
+    if (!isWalletConnectConfigured) {
+      setError('WalletConnect is not configured. Set VITE_WALLETCONNECT_PROJECT_ID in your environment.')
+      return
+    }
+
+    const modal = getAppKitModal()
+    if (!modal) {
+      setError('WalletConnect failed to initialize. Please try again.')
+      return
+    }
+
+    setError(null)
+    manuallyDisconnected.current = false
+
+    // Disconnect extension if connected
+    if (extConnected) {
+      setExtConnected(false)
+      setExtAddress(null)
+      setExtChainId(null)
+      setExtWalletClient(null)
+    }
+
+    try {
+      await modal.open()
+    } catch (err) {
+      console.error('WalletConnect error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to open WalletConnect')
+    }
+  }, [extConnected])
+
+  // === DISCONNECT ===
+  const disconnect = useCallback(() => {
+    manuallyDisconnected.current = true
+
+    // Disconnect extension
+    setExtConnected(false)
+    setExtConnecting(false)
+    setExtAddress(null)
+    setExtChainId(null)
+    setExtWalletClient(null)
+
+    // Disconnect wagmi
+    if (wagmiAccount.isConnected) {
+      wagmiDisconnect()
+    }
+
+    setProfileData(null)
+    setError(null)
+    setConnectionMethod(null)
+  }, [wagmiAccount.isConnected, wagmiDisconnect])
+
+  // === EXTENSION EVENT LISTENERS ===
+  useEffect(() => {
+    if (!extConnected) return
     const provider = getProvider()
     if (!provider) return
 
@@ -265,15 +367,15 @@ export function useWallet() {
       const accs = accounts as string[]
       if (accs.length === 0) {
         disconnect()
-      } else if (state.isConnected) {
-        setState(prev => ({ ...prev, address: accs[0] as Address }))
-        if (state.publicClient) {
-          fetchProfileData(accs[0] as Address, state.publicClient)
+      } else if (extConnected) {
+        setExtAddress(accs[0] as Address)
+        if (publicClient) {
+          fetchProfileData(accs[0] as Address, publicClient)
         }
       }
     }
 
-    const handleChainChanged = (_chainId: unknown) => {
+    const handleChainChanged = () => {
       // Reload the page on chain change for simplicity
       window.location.reload()
     }
@@ -285,17 +387,26 @@ export function useWallet() {
       provider.removeListener('accountsChanged', handleAccountsChanged)
       provider.removeListener('chainChanged', handleChainChanged)
     }
-  }, [getProvider, disconnect, state.isConnected, state.publicClient, fetchProfileData])
+  }, [extConnected, getProvider, disconnect, publicClient, fetchProfileData])
 
   return {
-    ...state,
+    isConnected,
+    isConnecting,
+    address,
+    chainId,
+    error,
+    walletClient,
+    publicClient,
     profileData,
-    isExtensionAvailable: isExtensionAvailable(),
-    connect,
+    connectionMethod,
+    isExtensionAvailable,
+    isWalletConnectAvailable: isWalletConnectConfigured,
+    connectExtension,
+    connectWalletConnect,
     disconnect,
     refetchProfile: () => {
-      if (state.address && state.publicClient) {
-        fetchProfileData(state.address, state.publicClient)
+      if (address && publicClient) {
+        fetchProfileData(address, publicClient)
       }
     },
   }

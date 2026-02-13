@@ -206,8 +206,11 @@ function App() {
             address={wallet.address}
             profileData={wallet.profileData}
             isExtensionAvailable={wallet.isExtensionAvailable}
+            isWalletConnectAvailable={wallet.isWalletConnectAvailable}
+            connectionMethod={wallet.connectionMethod}
             error={wallet.error}
-            onConnect={wallet.connect}
+            onConnectExtension={wallet.connectExtension}
+            onConnectWalletConnect={wallet.connectWalletConnect}
             onDisconnect={wallet.disconnect}
           />
         </section>
