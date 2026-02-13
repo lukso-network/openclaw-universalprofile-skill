@@ -47,7 +47,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          GITHUB_PAGES: 'true'
           VITE_WALLETCONNECT_PROJECT_ID: ${{ secrets.WALLETCONNECT_PROJECT_ID }}
 
       - name: Setup Pages

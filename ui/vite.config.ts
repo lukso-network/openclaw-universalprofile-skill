@@ -10,10 +10,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
   },
-  // GitHub Pages deployment - update this to match your repo name
-  base: process.env.GITHUB_PAGES === 'true' 
-    ? '/openclaw-universalprofile-skill/' 
-    : '/',
+  // GitHub Pages deployment with custom domain serves from root
+  base: '/',
   build: {
     outDir: 'dist',
     sourcemap: true,
