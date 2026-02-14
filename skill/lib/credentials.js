@@ -22,9 +22,6 @@ const CREDENTIAL_PATHS = [
   
   // 3. Legacy clawdbot location
   path.join(process.env.HOME, '.clawdbot', 'universal-profile', 'config.json'),
-  
-  // 4. Local skill directory (for testing)
-  path.join(__dirname, '..', 'credentials', 'config.json'),
 ];
 
 const KEY_PATHS = [
@@ -36,9 +33,6 @@ const KEY_PATHS = [
   
   // Legacy clawdbot
   path.join(process.env.HOME, '.clawdbot', 'credentials', 'universal-profile-key.json'),
-  
-  // Local skill directory
-  path.join(__dirname, '..', 'credentials', 'universal-profile-key.json'),
 ];
 
 /**

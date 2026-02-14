@@ -1,16 +1,17 @@
 {
   "name": "skill-universal-profile",
-  "version": "0.3.5",
-  "description": "Universal Profile skill for Clawdbot - LUKSO blockchain identity and permission management",
+  "version": "0.4.0",
+  "description": "Universal Profile skill for OpenClaw — LUKSO blockchain identity, permissions, tokens, and gasless relay transactions",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "audit": "npm audit"
   },
   "keywords": [
-    "clawdbot",
+    "openclaw",
     "skill",
     "lukso",
     "universal-profile",
@@ -18,7 +19,7 @@
     "blockchain",
     "web3"
   ],
-  "author": "Clawdbot",
+  "author": "frozeman",
   "license": "MIT",
   "dependencies": {
     "@lukso/eip191-signer.js": "^0.2.5",

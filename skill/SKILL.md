@@ -1,13 +1,11 @@
 ---
 name: universal-profile
 description: Manage LUKSO Universal Profiles — identity, permissions, tokens, and blockchain operations via direct or gasless relay transactions
-version: 0.3.7
+version: 0.4.0
 author: frozeman
 ---
 
 # Universal Profile Skill
-
-> ⚠️ **Early Draft Version** — Use at your own risk.
 
 > To authorize your OpenClaw bot, create a profile at [my.universalprofile.cloud](https://my.universalprofile.cloud), generate a controller key, then authorize it via the [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/).
 
@@ -35,56 +33,32 @@ up quota                                       # Check relay gas quota
 
 ## Credentials
 
-Loaded from (in order): `UP_CREDENTIALS_PATH` env → `~/.openclaw/universal-profile/config.json` → `~/.clawdbot/universal-profile/config.json` → `./credentials/config.json`
+### Required Environment Variables (optional — file-based fallback available)
 
-Key files: `UP_KEY_PATH` env → `~/.openclaw/credentials/universal-profile-key.json` → `~/.clawdbot/credentials/universal-profile-key.json`
+| Variable | Purpose |
+|----------|---------|
+| `UP_CREDENTIALS_PATH` | Path to config.json with UP address and controller info |
+| `UP_KEY_PATH` | Path to JSON file containing controller private key |
 
-### macOS Keychain Storage (Recommended on macOS)
+### File-Based Credential Locations (checked in order)
 
-On macOS, store the controller private key in the system Keychain instead of a plaintext JSON file. **This is the recommended approach** — the key is retrieved in memory only for signing and never written to disk.
+**Config:** `UP_CREDENTIALS_PATH` env → `~/.openclaw/universal-profile/config.json` → `~/.clawdbot/universal-profile/config.json`
 
-**Store the key:**
-```bash
-security add-generic-password \
-  -a "<controller-address>" \
-  -s "universalprofile-controller" \
-  -l "UP Controller Key" \
-  -D "Ethereum Private Key" \
-  -w "<private-key>" \
-  -T /usr/bin/security \
-  -U
-```
+**Key:** `UP_KEY_PATH` env → `~/.openclaw/credentials/universal-profile-key.json` → `~/.clawdbot/credentials/universal-profile-key.json`
 
-**Retrieve in code (Node.js):**
-```javascript
-import { execSync } from 'child_process';
+### Key Storage
 
-function getPrivateKeyFromKeychain(controllerAddress) {
-  return execSync(
-    `security find-generic-password -a "${controllerAddress}" -s "universalprofile-controller" -w`,
-    { encoding: 'utf8', timeout: 10000 }
-  ).trim();
-}
+The controller private key can be provided via:
 
-// Use for signing, then clear from memory
-let privateKey = getPrivateKeyFromKeychain('0xYourController...');
-const signingKey = new ethers.SigningKey(privateKey);
-// ... sign ...
-privateKey = null; // Clear from memory
-```
+1. **Environment variable** (recommended for CI/automated use): Set `UP_KEY_PATH` pointing to a secure JSON key file
+2. **JSON key file** at `~/.openclaw/credentials/universal-profile-key.json`
+3. **macOS Keychain** (optional, macOS only): Store the key in Keychain using `security add-generic-password`. The skill's credentials loader will check Keychain as a fallback if no file-based key is found.
 
-**Notes:**
-- `-T /usr/bin/security` grants the `security` CLI access without a GUI prompt, required for automated agent use
-- Apple's Secure Enclave does not support secp256k1 (Ethereum's curve), so the key must be extracted for signing — but it stays in memory only, never on disk
-- After storing in Keychain, delete the JSON credentials file
-- **This approach is macOS-only.** On Linux, consider using a secrets manager, encrypted keyring, or environment variables instead
-
-### ⚠️ JSON Key File (Less Secure)
-
-If you use the JSON key file (`~/.openclaw/credentials/universal-profile-key.json`), be aware:
-- The private key is stored on disk (even if the format is obfuscated)
-- Ensure the file has restricted permissions: `chmod 600 ~/.openclaw/credentials/universal-profile-key.json`
-- Prefer Keychain storage on macOS whenever possible
+**Security best practices:**
+- Restrict key file permissions: `chmod 600 ~/.openclaw/credentials/universal-profile-key.json`
+- Private keys are only loaded into memory for signing, then cleared
+- Consider using a dedicated controller key with minimal permissions (see Permission Best Practices below)
+- On Linux, use environment variables or a secrets manager
 
 ## Transactions
 
@@ -312,10 +286,11 @@ await fetch('https://relayer.mainnet.lukso.network/api/execute', {
 - Never log private keys.
 
 ### Key Management
-- **Recommended (macOS):** Store private keys in macOS Keychain (see Credentials section above)
-- **JSON key files:** If used, restrict permissions (`chmod 600`) and consider migrating to Keychain
+- Restrict key file permissions: `chmod 600` on all credential files
 - Private keys are only loaded into memory for signing, then cleared
+- Use a dedicated controller key with minimal permissions — never use the UP owner key
 - The `config set` command is restricted to safe keys only — `keystorePath` and `profiles` cannot be modified at runtime to prevent path redirection attacks
+- Never log, print, or transmit private keys
 
 ### Network Access
 This skill only communicates with known LUKSO ecosystem endpoints:
