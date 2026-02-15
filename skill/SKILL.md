@@ -9,26 +9,25 @@ author: frozeman
 
 > To authorize your OpenClaw bot, create a profile at [my.universalprofile.cloud](https://my.universalprofile.cloud), generate a controller key, then authorize it via the [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/).
 
-## ⚠️ CRITICAL: Identity Rules
+## Identity & Execution
 
-**Your Universal Profile (UP) address IS your identity. Your controller key is NOT.**
+Your **Universal Profile (UP) address** is your on-chain identity. The controller key is just a signing key with permission to act on behalf of your UP — think of it like a session key.
 
-The controller key is just a signing key that has permission to act on behalf of your UP. It is like a session key — it should never appear as the sender/actor in any on-chain interaction.
+All interactions with other contracts (follows, transfers, contract calls) should go through the UP so they are attributed to your profile, not your controller EOA. There are two ways to do this:
 
-**ALWAYS route ALL transactions through the UP using `execute()`:**
+**1. Direct execution** (controller pays gas):
 ```
-Controller → UP.execute(0, targetContract, 0, encodedCall) → Target
-```
-
-**NEVER call contracts directly from the controller key:**
-```
-❌ Controller → LSP26.follow(targetAddress)        // WRONG: follow registered from controller
-✅ Controller → UP.execute(0, LSP26, 0, follow())  // RIGHT: follow registered from UP
+Controller → UP.execute(0, targetContract, 0, encodedCall)
 ```
 
-This applies to **everything**: follows, token transfers, setData, contract calls. The only exception is `setData()` which can be called directly on the UP (it checks permissions internally).
+**2. Gasless relay** (LUKSO relayer pays gas):
+```
+Controller signs payload → Relayer submits → KeyManager → UP.execute(...)
+```
 
-If you call a contract directly from the controller, the `msg.sender` will be the controller EOA, not the UP — so follows, token sends, etc. will be attributed to the wrong address.
+Both ensure `msg.sender` at the target contract is your UP address. See [Transactions](#transactions) for implementation details.
+
+The only exception is `setData()` / `setDataBatch()` — these can be called directly on the UP because it checks controller permissions internally.
 
 ## Installation
 
