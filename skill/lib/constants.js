@@ -171,6 +171,13 @@ export const FACTORY_ADDRESSES = {
 };
 
 /**
+ * Singleton contract addresses (same on mainnet & testnet)
+ */
+export const SINGLETON_ADDRESSES = {
+  LSP26_FOLLOWER_SYSTEM: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+};
+
+/**
  * Contract ABIs (minimal interfaces)
  */
 export const ABIS = {
@@ -231,6 +238,15 @@ export const ABIS = {
     'function revokeOperator(address operator, bytes32 tokenId, bool notify, bytes operatorNotificationData)',
     'function isOperatorFor(address operator, bytes32 tokenId) view returns (bool)',
   ],
+
+  // LSP26 (Follower System)
+  LSP26: [
+    'function follow(address addr)',
+    'function unfollow(address addr)',
+    'function isFollowing(address follower, address addr) view returns (bool)',
+    'function followerCount(address addr) view returns (uint256)',
+    'function followingCount(address addr) view returns (uint256)',
+  ],
 };
 
 /**
@@ -245,6 +261,7 @@ export const INTERFACE_IDS = {
   LSP7: '0xc52d6008', // Digital Asset
   LSP8: '0x3a271706', // Identifiable Digital Asset
   LSP9: '0x28af17e6', // Vault
+  LSP26: '0x2b299cea', // Follower System
 };
 
 /**

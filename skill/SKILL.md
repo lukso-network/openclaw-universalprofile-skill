@@ -1,13 +1,34 @@
 ---
 name: universal-profile
 description: Manage LUKSO Universal Profiles — identity, permissions, tokens, and blockchain operations via direct or gasless relay transactions
-version: 0.4.0
+version: 0.5.0
 author: frozeman
 ---
 
 # Universal Profile Skill
 
 > To authorize your OpenClaw bot, create a profile at [my.universalprofile.cloud](https://my.universalprofile.cloud), generate a controller key, then authorize it via the [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/).
+
+## ⚠️ CRITICAL: Identity Rules
+
+**Your Universal Profile (UP) address IS your identity. Your controller key is NOT.**
+
+The controller key is just a signing key that has permission to act on behalf of your UP. It is like a session key — it should never appear as the sender/actor in any on-chain interaction.
+
+**ALWAYS route ALL transactions through the UP using `execute()`:**
+```
+Controller → UP.execute(0, targetContract, 0, encodedCall) → Target
+```
+
+**NEVER call contracts directly from the controller key:**
+```
+❌ Controller → LSP26.follow(targetAddress)        // WRONG: follow registered from controller
+✅ Controller → UP.execute(0, LSP26, 0, follow())  // RIGHT: follow registered from UP
+```
+
+This applies to **everything**: follows, token transfers, setData, contract calls. The only exception is `setData()` which can be called directly on the UP (it checks permissions internally).
+
+If you call a contract directly from the controller, the `msg.sender` will be the controller EOA, not the UP — so follows, token sends, etc. will be attributed to the wrong address.
 
 ## Installation
 
@@ -164,6 +185,32 @@ Permissions are a bytes32 BitArray at `AddressPermissions:Permissions:<address>`
 | LSP26 (`0x2b299cea`) | FollowerSystem | On-chain follow/unfollow |
 
 Full ABIs, interface IDs, and ERC725Y data keys are in `lib/constants.js`.
+
+## LSP26 — Follow / Unfollow
+
+Follow and unfollow MUST be routed through the UP via `execute()`. The LSP26 FollowerSystem contract address is `0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA` on mainnet.
+
+```javascript
+import { ethers } from 'ethers';
+import { executeDirect, buildExecutePayload } from './lib/execute/direct.js';
+// Or for gasless: import { executeRelay } from './lib/execute/relay.js';
+
+const LSP26_ADDRESS = '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA';
+const LSP26_ABI = ['function follow(address addr)', 'function unfollow(address addr)'];
+const lsp26 = new ethers.Interface(LSP26_ABI);
+
+// Encode the follow call
+const followData = lsp26.encodeFunctionData('follow', [targetAddress]);
+
+// Route through UP: operation=0 (CALL), target=LSP26, value=0, data=follow()
+await executeDirect(0, LSP26_ADDRESS, 0, followData);
+
+// For gasless relay:
+// const payload = buildExecutePayload(0, LSP26_ADDRESS, 0, followData);
+// await executeRelay(payload);
+```
+
+**⚠️ NEVER call `follow()` directly from the controller key** — the follow will be registered from the controller address instead of the UP.
 
 ## VerifiableURI Encoding (LSP2)
 
