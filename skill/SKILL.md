@@ -7,7 +7,7 @@ author: frozeman
 
 # Universal Profile Skill
 
-Authorize your bot: create a profile at [my.universalprofile.cloud](https://my.universalprofile.cloud), generate a controller key, authorize via [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/).
+Authorize your bot: create a profile at [my.universalprofile.cloud](https://my.universalprofile.cloud), generate a controller key, authorize via [Authorization UI](https://openclaw.universalprofile.cloud).
 
 ## Core Concepts
 
@@ -152,7 +152,7 @@ UPs can be redeployed at the same address on other chains by replaying the origi
 1. Retrieve original deployment calldata: `node commands/cross-chain-deploy-data.js <upAddress> [--verify]`
 2. Fund controller with ETH on target chain
 3. Submit same calldata to factory: `wallet.sendTransaction({ to: factoryAddress, data: calldata, value: 0n })`
-4. Authorize controller on new chain via [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/) (permissions are per-chain)
+4. Authorize controller on new chain via [Authorization UI](https://openclaw.universalprofile.cloud) (permissions are per-chain)
 
 ### Limitations
 - Legacy UPs (pre-LSP23, old lsp-factory) have no deployment events
@@ -265,7 +265,7 @@ Known collection "Art by the Machine": `0x439f6793b10b0a9d88ad05293a074a8141f19d
 | UP_RELAY_FAILED | Relay error — check quota (LUKSO only) |
 | UP_INVALID_SIGNATURE | Wrong chainId, used nonce, or expired timestamps |
 | UP_QUOTA_EXCEEDED | Monthly relay quota exhausted (LUKSO only) |
-| UP_NOT_AUTHORIZED | Not a controller — use [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/) |
+| UP_NOT_AUTHORIZED | Not a controller — use [Authorization UI](https://openclaw.universalprofile.cloud) |
 
 ## Security
 
@@ -282,6 +282,6 @@ Node.js 18+, ethers.js v6, `@lukso/eip191-signer.js`, viem.
 
 ## Links
 
-[LUKSO Docs](https://docs.lukso.tech/) · [Universal Everything](https://universaleverything.io/) · [LSP6 Spec](https://docs.lukso.tech/standards/access-control/lsp6-key-manager) · [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/)
+[LUKSO Docs](https://docs.lukso.tech/) · [Universal Everything](https://universaleverything.io/) · [LSP6 Spec](https://docs.lukso.tech/standards/access-control/lsp6-key-manager) · [Authorization UI](https://openclaw.universalprofile.cloud)
 
 Profile URLs: always use `https://universaleverything.io/<address>`

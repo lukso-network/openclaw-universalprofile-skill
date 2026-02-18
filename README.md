@@ -32,7 +32,7 @@ npm install
 ## Setup
 
 1. **Create a Universal Profile** at [my.universalprofile.cloud](https://my.universalprofile.cloud)
-2. **Generate a controller key** and authorize it using the [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/)
+2. **Generate a controller key** and authorize it using the [Authorization UI](https://openclaw.universalprofile.cloud)
 3. **Configure the skill:**
 
 ```bash
