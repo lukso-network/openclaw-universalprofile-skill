@@ -1,7 +1,7 @@
 ---
 name: universal-profile
 description: Manage LUKSO Universal Profiles — identity, permissions, tokens, and blockchain operations via direct or gasless relay transactions
-version: 0.5.0
+version: 0.6.0
 author: frozeman
 ---
 
@@ -436,6 +436,59 @@ Pass `metadataJson` to build-mint and the API auto-pins it to IPFS.
 | Moment | `https://www.forevermoments.life/moments/<momentTokenAddress>` |
 | Profile | `https://www.forevermoments.life/profile/<upAddress>` |
 | Feed | `https://www.forevermoments.life/moments` |
+
+## Cross-Chain Deployment
+
+Universal Profiles can be redeployed on other EVM chains (Base, Ethereum) using the same LSP23 factory calldata from the original deployment. The factory and all implementation contracts are deployed at identical addresses across chains via CREATE2.
+
+### How It Works
+
+1. **Retrieve** the original LSP23 deployment calldata from the source chain
+2. **Resubmit** the same calldata to the same factory address on the target chain
+3. The same salt + implementations = same UP address on every chain
+
+### CLI
+
+```bash
+# Get deployment calldata for a UP
+node commands/cross-chain-deploy-data.js <upAddress> [--chain lukso] [--verify] [--json]
+
+# Example with verification of target chains
+node commands/cross-chain-deploy-data.js 0x1089E1c613Db8Cb91db72be4818632153E62557a --verify
+```
+
+### Programmatic Usage
+
+```javascript
+import { getCrossChainDeployData } from './commands/cross-chain-deploy-data.js';
+
+// Get deployment data
+const data = await getCrossChainDeployData('0xYourUP', { chain: 'lukso', verify: true });
+// data.calldata → full calldata to resubmit on target chain
+// data.factoryAddress → 0x2300000A84D25dF63081feAa37ba6b62C4c89a30
+
+// Redeploy on target chain
+const tx = await wallet.sendTransaction({
+  to: data.factoryAddress,
+  data: data.calldata,
+  value: data.value,
+});
+```
+
+### Base Contracts (identical on LUKSO, Base, Ethereum)
+
+| Contract | Address |
+|----------|---------|
+| LSP23 Factory | `0x2300000A84D25dF63081feAa37ba6b62C4c89a30` |
+| UniversalProfileInit v0.14.0 | `0x3024D38EA2434BA6635003Dc1BDC0daB5882ED4F` |
+| LSP6KeyManagerInit v0.14.0 | `0x2Fe3AeD98684E7351aD2D408A43cE09a738BF8a4` |
+| PostDeploymentModule | `0x000000000066093407b6704B89793beFfD0D8F00` |
+
+### Limitations
+
+- **Legacy UPs** deployed before LSP23 (via old lsp-factory) won't have deployment events
+- **Address determinism** depends on salt, implementations, and init data being identical
+- The `--verify` flag confirms all base contracts exist on target chains before attempting redeployment
 
 ## Error Codes
 
