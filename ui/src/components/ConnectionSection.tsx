@@ -1,5 +1,6 @@
 import { formatAddress } from '../utils'
 import { LuksoProfileAvatar } from './LuksoProfileAvatar'
+import { getChainById } from '../constants'
 import type { ProfileData, ConnectionMethod } from '../hooks/useWallet'
 
 interface ConnectionSectionProps {
@@ -11,6 +12,7 @@ interface ConnectionSectionProps {
   isWalletConnectAvailable: boolean
   connectionMethod: ConnectionMethod
   error: string | null
+  chainId?: number | null
   onConnectExtension: () => void
   onConnectWalletConnect: () => void
   onDisconnect: () => void
@@ -25,6 +27,7 @@ export function ConnectionSection({
   isWalletConnectAvailable,
   connectionMethod,
   error,
+  chainId,
   onConnectExtension,
   onConnectWalletConnect,
   onDisconnect,
@@ -48,6 +51,11 @@ export function ConnectionSection({
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-lg">
                   {profileData?.profileName || 'Universal Profile'}
+                  {chainId && chainId !== 42 && chainId !== 4201 && (
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-1">
+                      (on {getChainById(chainId)?.name ?? 'Unknown'})
+                    </span>
+                  )}
                 </h3>
                 <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full">
                   Connected

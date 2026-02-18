@@ -12,7 +12,7 @@ import {
 } from 'viem'
 import { useAccount, useDisconnect, useWalletClient as useWagmiWalletClient, useSwitchChain } from 'wagmi'
 import { CHAINS, LSP0_ABI, DATA_KEYS, getChainById } from '../constants'
-import { convertIpfsUrl, fetchProfileFromIndexer } from '../utils'
+import { fetchLuksoProfileData } from './useLuksoProfile'
 import { isWalletConnectConfigured } from '../lib/walletConfig'
 import { getAppKitModal } from '../providers/WalletProvider'
 
@@ -233,16 +233,17 @@ export function useWallet() {
   }, [extConnected, isWcConnected, getProvider, wagmiSwitchChain])
 
   // === PROFILE FETCHING ===
+  // Owner + controllers come from the current chain; profile metadata always from LUKSO mainnet.
   const fetchProfileData = useCallback(async (addr: Address, pc: PublicClient) => {
     try {
-      // Get owner
+      // Get owner from current chain
       const owner = await pc.readContract({
         address: addr,
         abi: LSP0_ABI,
         functionName: 'owner',
       }) as Address
 
-      // Get controllers count
+      // Get controllers count from current chain
       const lengthData = await pc.readContract({
         address: addr,
         abi: LSP0_ABI,
@@ -254,78 +255,15 @@ export function useWallet() {
         ? parseInt(lengthData.slice(0, 34), 16)
         : 0
 
-      let profileName: string | undefined
-      let profileDescription: string | undefined
-      let profileImage: string | undefined
-
-      // Try LUKSO indexer first (only available for LUKSO chains)
-      const pcChainId = pc.chain?.id
-      if (pcChainId === 42 || pcChainId === 4201) {
-        try {
-          const indexerProfile = await fetchProfileFromIndexer(addr)
-          if (indexerProfile) {
-            profileName = indexerProfile.name || undefined
-            profileImage = indexerProfile.profileImageUrl || undefined
-          }
-        } catch (err) {
-          console.error('Indexer fetch failed, falling back to on-chain:', err)
-        }
-      }
-
-      // Fallback: parse LSP3 on-chain data if indexer didn't return an image
-      if (!profileImage) {
-        const profileDataHex = await pc.readContract({
-          address: addr,
-          abi: LSP0_ABI,
-          functionName: 'getData',
-          args: [DATA_KEYS['LSP3Profile'] as Hex],
-        }) as Hex
-
-        if (profileDataHex && profileDataHex !== '0x' && profileDataHex.length > 10) {
-          try {
-            const urlHex = profileDataHex.slice(2 + 72)
-            const urlBytes = urlHex.match(/.{1,2}/g)
-            if (urlBytes) {
-              let jsonUrl = ''
-              for (const byte of urlBytes) {
-                const charCode = parseInt(byte, 16)
-                if (charCode === 0) break
-                jsonUrl += String.fromCharCode(charCode)
-              }
-
-              if (jsonUrl) {
-                const httpUrl = convertIpfsUrl(jsonUrl)
-                const response = await fetch(httpUrl)
-                if (response.ok) {
-                  const profileJson = await response.json()
-                  if (!profileName) {
-                    profileName = profileJson.LSP3Profile?.name || profileJson.name
-                  }
-                  profileDescription = profileJson.LSP3Profile?.description || profileJson.description
-
-                  const images = profileJson.LSP3Profile?.profileImage || profileJson.profileImage
-                  if (images && images.length > 0) {
-                    const imageUrl = typeof images[0] === 'string' ? images[0] : images[0]?.url
-                    if (imageUrl) {
-                      profileImage = convertIpfsUrl(imageUrl)
-                    }
-                  }
-                }
-              }
-            }
-          } catch (err) {
-            console.error('Error parsing LSP3 profile data:', err)
-          }
-        }
-      }
+      // Always fetch profile metadata (name, image) from LUKSO mainnet
+      const luksoProfile = await fetchLuksoProfileData(addr)
 
       setProfileData({
         address: addr,
         owner,
         controllersCount,
-        profileName,
-        profileDescription,
-        profileImage,
+        profileName: luksoProfile.name || undefined,
+        profileImage: luksoProfile.profileImageUrl || undefined,
       })
     } catch (err) {
       console.error('Error fetching profile data:', err)

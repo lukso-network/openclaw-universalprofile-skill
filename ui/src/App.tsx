@@ -284,6 +284,7 @@ function App() {
             isWalletConnectAvailable={wallet.isWalletConnectAvailable}
             connectionMethod={wallet.connectionMethod}
             error={wallet.error}
+            chainId={effectiveChainId}
             onConnectExtension={wallet.connectExtension}
             onConnectWalletConnect={wallet.connectWalletConnect}
             onDisconnect={wallet.disconnect}
