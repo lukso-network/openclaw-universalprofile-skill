@@ -484,11 +484,23 @@ const tx = await wallet.sendTransaction({
 | LSP6KeyManagerInit v0.14.0 | `0x2Fe3AeD98684E7351aD2D408A43cE09a738BF8a4` |
 | PostDeploymentModule | `0x000000000066093407b6704B89793beFfD0D8F00` |
 
+### Cross-Chain Deployment Workflow
+
+When a user asks "deploy my profile on another network" (Base or Ethereum):
+
+1. **Retrieve deployment calldata** using the script above
+2. **Fund the controller** — the user must send ETH (Base ETH or mainnet ETH) to the agent's controller address so it can pay gas for the deployment transaction
+3. **Authorize the controller on the new chain** — the user's initial controller (who created the UP on LUKSO) is NOT the same as the agent's controller. After deployment, the user must visit the [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/) and switch to Base or Ethereum using the network selector, then authorize the agent's controller on that chain
+4. **Submit the deployment** — send the exact calldata to the LSP23 factory on the target chain (implementation pending)
+
+**Important:** The UP will have the same address on all chains, but controller permissions are per-chain. Authorization must happen separately on each network.
+
 ### Limitations
 
 - **Legacy UPs** deployed before LSP23 (via old lsp-factory) won't have deployment events
 - **Address determinism** depends on salt, implementations, and init data being identical
 - The `--verify` flag confirms all base contracts exist on target chains before attempting redeployment
+- **Cross-chain deployment execution** is not yet implemented — the script only retrieves the calldata
 
 ## Error Codes
 
