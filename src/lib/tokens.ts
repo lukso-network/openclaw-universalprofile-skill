@@ -2,16 +2,13 @@
  * Token Management - LSP7 and LSP8 Operations
  */
 
-import { ethers, Contract, Provider, Wallet } from 'ethers';
+import { ethers, Contract, Provider } from 'ethers';
 import { LSP7_ABI, LSP7_MINTABLE_ABI } from '../contracts/lsp7.js';
 import { LSP8_ABI, LSP8_MINTABLE_ABI, LSP8_TOKEN_ID_FORMAT } from '../contracts/lsp8.js';
-import { LSP0_ABI } from '../contracts/lsp0.js';
 import { INTERFACE_IDS, OPERATION_TYPES, DATA_KEYS } from '../utils/constants.js';
 import {
   LSP7TokenInfo,
   LSP8CollectionInfo,
-  TokenDeployParams,
-  NFTDeployParams,
   ExecuteParams,
   UniversalProfileError,
   ERROR_CODES,

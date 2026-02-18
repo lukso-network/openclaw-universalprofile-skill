@@ -74,7 +74,7 @@ export const DATA_KEYS = {
   // Permissions (LSP6)
   'AddressPermissions[]': {
     length: '0xdf30dba06db6a30e65354d9a64c609861f089545ca58c6b4dbe31a5f338cb0e3',
-    index: '0xdf30dba06db6a30e65354d9a64c609861f089545ca58c6b4dbe31a5f338cb0e3',
+    index: '0xdf30dba06db6a30e65354d9a64c60986',
   },
   'AddressPermissions:Permissions': '0x4b80742de2bf82acb3630000', // + address (20 bytes)
   'AddressPermissions:AllowedCalls': '0x4b80742de2bf393a64c70000', // + address (20 bytes)

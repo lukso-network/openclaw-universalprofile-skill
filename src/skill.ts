@@ -2,7 +2,7 @@
  * Universal Profile Skill - High-Level API
  */
 
-import { ethers, Provider, JsonRpcProvider, Wallet } from 'ethers';
+import { Provider, JsonRpcProvider, Wallet } from 'ethers';
 import {
   generateKeyPair,
   encryptKey,
@@ -10,11 +10,8 @@ import {
   loadKeystore,
   saveKey,
   listStoredKeys,
-  getWallet,
 } from './lib/crypto.js';
 import {
-  PERMISSION_PRESETS,
-  combinePermissions,
   decodePermissions,
   validatePermissions,
   getPresetConfig,
@@ -22,57 +19,34 @@ import {
 import {
   deployUniversalProfile,
   computeDeploymentAddresses,
-  verifyDeployment,
   generateSalt,
 } from './lib/deployment.js';
 import {
   executeViaRelay,
-  setDataViaRelay,
-  getNonce,
-  checkRelayQuota,
 } from './lib/relay.js';
 import {
   getProfileInfo,
-  getControllers,
-  isController,
-  getKeyManager,
-  getData,
 } from './lib/profile.js';
 import {
   getLSP7Info,
   getLSP8Info,
-  getLSP7Balance,
-  getLSP8TokensOf,
   encodeLSP7Transfer,
   encodeLSP8Transfer,
   encodeLSP7AuthorizeOperator,
-  encodeLSP8AuthorizeOperator,
-  encodeLSP7Mint,
-  encodeLSP8Mint,
 } from './lib/tokens.js';
 import {
-  getSwapQuote,
   getQuoteWithSlippage,
-  getPoolInfo,
   encodeSwapExactTokensForTokens,
-  encodeSwapExactETHForTokens,
-  encodeAddLiquidity,
   getDeadline,
 } from './lib/dex.js';
 import {
   getListing,
   getCollectionListings,
-  getSellerListings,
-  getCollectionFloorPrice,
-  isNFTListed,
-  encodeCreateListing,
   encodeBuyListing,
-  encodeCancelListing,
   getListingOperations,
 } from './lib/marketplace.js';
 import {
   loadConfig,
-  saveConfig,
   updateConfig,
   getNetworkConfig,
   getRpcUrl,
@@ -83,7 +57,6 @@ import {
   setControllerKeyConfig,
   resolveTokenAddress,
 } from './utils/config.js';
-import { NETWORKS, OPERATION_TYPES } from './utils/constants.js';
 import {
   SkillConfig,
   KeyPair,

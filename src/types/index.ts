@@ -2,8 +2,6 @@
  * Universal Profile Skill - Type Definitions
  */
 
-import { ethers } from 'ethers';
-
 // ==================== KEY MANAGEMENT ====================
 
 export interface KeyPair {

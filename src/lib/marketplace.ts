@@ -3,7 +3,7 @@
  */
 
 import { ethers, Contract, Provider } from 'ethers';
-import { MARKETPLACE_ABI, MarketplaceListing, MarketplaceOffer } from '../contracts/marketplace.js';
+import { MARKETPLACE_ABI } from '../contracts/marketplace.js';
 import { OPERATION_TYPES } from '../utils/constants.js';
 import { encodeLSP8AuthorizeOperator } from './tokens.js';
 import {
@@ -12,8 +12,6 @@ import {
   OfferParams,
   OfferInfo,
   ExecuteParams,
-  UniversalProfileError,
-  ERROR_CODES,
 } from '../types/index.js';
 
 // ==================== LISTING QUERIES ====================

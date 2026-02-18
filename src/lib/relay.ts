@@ -5,7 +5,7 @@
 import { ethers, Contract, Wallet, Provider } from 'ethers';
 import { LSP6_ABI } from '../contracts/lsp6.js';
 import { LSP0_ABI } from '../contracts/lsp0.js';
-import { LSP25_VERSION, NETWORKS, OPERATION_TYPES } from '../utils/constants.js';
+import { LSP25_VERSION } from '../utils/constants.js';
 import {
   RelayCallParams,
   RelayCallResult,
@@ -116,7 +116,7 @@ export async function executeViaRelayer(
       );
     }
 
-    const result = await response.json();
+    const result = await response.json() as { transactionHash: string; returnData?: string };
 
     return {
       transactionHash: result.transactionHash,
@@ -262,7 +262,7 @@ export async function checkRelayQuota(
       };
     }
 
-    const data = await response.json();
+    const data = await response.json() as { remaining?: number; total?: number; resetsAt?: string };
 
     return {
       remaining: data.remaining || 0,
@@ -287,7 +287,7 @@ export async function checkRelayQuota(
  */
 export async function executeViaRelay(
   signer: Wallet,
-  upAddress: string,
+  _upAddress: string,
   keyManagerAddress: string,
   params: ExecuteParams,
   options: {
@@ -347,7 +347,7 @@ export async function executeViaRelay(
  */
 export async function setDataViaRelay(
   signer: Wallet,
-  upAddress: string,
+  _upAddress: string,
   keyManagerAddress: string,
   dataKey: string,
   dataValue: string,

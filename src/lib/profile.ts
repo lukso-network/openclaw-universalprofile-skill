@@ -370,7 +370,7 @@ export async function verifyKeyManager(
 
   // Check Key Manager's target is the UP
   const km = new Contract(keyManagerAddress, LSP6_ABI, provider);
-  const target = await km.target();
+  const target: string = await km.getFunction('target')();
 
   return target.toLowerCase() === upAddress.toLowerCase();
 }

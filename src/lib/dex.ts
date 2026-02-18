@@ -9,15 +9,12 @@ import {
   UNISWAP_V2_PAIR_ABI,
 } from '../contracts/dex.js';
 import { OPERATION_TYPES, DEFAULTS } from '../utils/constants.js';
-import { encodeLSP7AuthorizeOperator } from './tokens.js';
 import {
   SwapParams,
   SwapQuote,
   LiquidityParams,
   PoolInfo,
   ExecuteParams,
-  UniversalProfileError,
-  ERROR_CODES,
 } from '../types/index.js';
 
 // ==================== PRICE QUERIES ====================

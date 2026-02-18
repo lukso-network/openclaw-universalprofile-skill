@@ -275,7 +275,7 @@ export async function verifyDeployment(
 
   // Check Key Manager target is UP
   const km = new Contract(keyManagerAddress, LSP6_ABI, provider);
-  const target = await km.target();
+  const target: string = await km.getFunction('target')();
   if (target.toLowerCase() !== upAddress.toLowerCase()) {
     return false;
   }

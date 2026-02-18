@@ -1,6 +1,6 @@
 {
   "name": "skill-universal-profile",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Universal Profile skill for OpenClaw — LUKSO blockchain identity, permissions, tokens, and gasless relay transactions",
   "main": "index.js",
   "type": "module",
