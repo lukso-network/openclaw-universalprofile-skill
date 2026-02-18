@@ -1,7 +1,7 @@
 ---
 name: universal-profile
-description: Manage LUKSO Universal Profiles — identity, permissions, tokens, and blockchain operations via direct or gasless relay transactions
-version: 0.6.0
+description: Manage LUKSO Universal Profiles — identity, permissions, tokens, and blockchain operations via direct or gasless relay transactions. Cross-chain support for Base and Ethereum via direct execution.
+version: 0.6.1
 author: frozeman
 ---
 
@@ -26,6 +26,10 @@ Controller signs payload → Relayer submits → KeyManager → UP.execute(...)
 ```
 
 Both ensure `msg.sender` at the target contract is your UP address. See [Transactions](#transactions) for implementation details.
+
+**⚠️ Cross-Chain Execution Model:**
+- **LUKSO (chain 42/4201):** Both direct execution and gasless relay are available. UPs created via universalprofile.cloud have a monthly gas quota from LUKSO's relayer.
+- **Base, Ethereum, and all other chains:** Only **direct execution** is supported. The LUKSO relay service is exclusive to the LUKSO network. Your controller key must hold native gas tokens (ETH) on the target chain to pay for transactions. There is no gasless option on non-LUKSO chains.
 
 The only exception is `setData()` / `setDataBatch()` — these can be called directly on the UP because it checks controller permissions internally.
 
@@ -313,13 +317,16 @@ await fetch('https://relayer.mainnet.lukso.network/api/execute', {
 
 ## Network Config
 
-| | Mainnet | Testnet |
-|---|---|---|
-| Chain ID | 42 | 4201 |
-| RPC | `https://42.rpc.thirdweb.com` | `https://rpc.testnet.lukso.network` |
-| Explorer | `https://explorer.lukso.network` | `https://explorer.testnet.lukso.network` |
-| Relay | `https://relayer.mainnet.lukso.network/api` | `https://relayer.testnet.lukso.network/api` |
-| Token | LYX (18 dec) | LYXt (18 dec) |
+| | LUKSO Mainnet | LUKSO Testnet | Base | Ethereum |
+|---|---|---|---|---|
+| Chain ID | 42 | 4201 | 8453 | 1 |
+| RPC | `https://42.rpc.thirdweb.com` | `https://rpc.testnet.lukso.network` | `https://mainnet.base.org` | `https://eth.llamarpc.com` |
+| Explorer | `https://explorer.lukso.network` | `https://explorer.testnet.lukso.network` | `https://basescan.org` | `https://etherscan.io` |
+| Relay | `https://relayer.mainnet.lukso.network/api` | `https://relayer.testnet.lukso.network/api` | ❌ None | ❌ None |
+| Token | LYX (18 dec) | LYXt (18 dec) | ETH (18 dec) | ETH (18 dec) |
+| Execution | Direct + Relay | Direct + Relay | Direct only | Direct only |
+
+**⚠️ The LUKSO gasless relay is ONLY available on LUKSO mainnet and testnet.** On Base and Ethereum, all transactions require the controller to hold ETH for gas. There is no relay/gasless option on non-LUKSO networks.
 
 ## Security
 
@@ -339,13 +346,15 @@ await fetch('https://relayer.mainnet.lukso.network/api/execute', {
 - Never log, print, or transmit private keys
 
 ### Network Access
-This skill only communicates with known LUKSO ecosystem endpoints:
-- **RPC:** `https://42.rpc.thirdweb.com` (mainnet), `https://rpc.testnet.lukso.network` (testnet)
-- **Relay:** `https://relayer.mainnet.lukso.network/api` (gasless transactions)
+This skill communicates with known blockchain and LUKSO ecosystem endpoints:
+- **LUKSO RPC:** `https://42.rpc.thirdweb.com` (mainnet), `https://rpc.testnet.lukso.network` (testnet)
+- **Base RPC:** `https://mainnet.base.org`
+- **Ethereum RPC:** `https://eth.llamarpc.com`
+- **Relay:** `https://relayer.mainnet.lukso.network/api` (gasless transactions — **LUKSO only**)
 - **IPFS:** `https://api.universalprofile.cloud/ipfs/` (metadata), `https://www.forevermoments.life/api/pinata` (pinning)
-- **Forever Moments API:** `https://www.forevermoments.life/api/agent/v1` (NFT minting)
+- **Forever Moments API:** `https://www.forevermoments.life/api/agent/v1` (NFT minting — LUKSO only)
 
-No other external network calls are made. All transaction signing happens locally.
+All transaction signing happens locally.
 
 ## Forever Moments (NFT Moments & Collections)
 
@@ -490,17 +499,43 @@ When a user asks "deploy my profile on another network" (Base or Ethereum):
 
 1. **Retrieve deployment calldata** using the script above
 2. **Fund the controller** — the user must send ETH (Base ETH or mainnet ETH) to the agent's controller address so it can pay gas for the deployment transaction
-3. **Authorize the controller on the new chain** — the user's initial controller (who created the UP on LUKSO) is NOT the same as the agent's controller. After deployment, the user must visit the [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/) and switch to Base or Ethereum using the network selector, then authorize the agent's controller on that chain
-4. **Submit the deployment** — send the exact calldata to the LSP23 factory on the target chain (implementation pending)
+3. **Submit the deployment** — send the exact calldata to the LSP23 factory on the target chain:
+   ```javascript
+   const tx = await wallet.sendTransaction({
+     to: data.factoryAddress,  // 0x2300000A84D25dF63081feAa37ba6b62C4c89a30
+     data: data.calldata,
+     value: 0n,
+     gasLimit: gasEstimate * 130n / 100n,  // 30% buffer
+   });
+   ```
+4. **Authorize the controller on the new chain** — the user's initial controller (who created the UP on LUKSO) is NOT the same as the agent's controller. After deployment, the user must visit the [Authorization UI](https://lukso-network.github.io/openclaw-universalprofile-skill/) and switch to Base or Ethereum using the network selector, then authorize the agent's controller on that chain
 
 **Important:** The UP will have the same address on all chains, but controller permissions are per-chain. Authorization must happen separately on each network.
+
+### Cross-Chain Execution (Post-Deployment)
+
+Once a UP is deployed on a non-LUKSO chain, the agent interacts with it via **direct execution only** — there is no relay/gasless option outside LUKSO.
+
+```javascript
+// Direct execution on Base/Ethereum — controller pays gas
+const provider = new ethers.JsonRpcProvider(rpcUrl); // Base or Ethereum RPC
+const wallet = new ethers.Wallet(controllerPrivateKey, provider);
+
+// Route through KeyManager → UP → Target
+const km = new ethers.Contract(keyManagerAddress, ['function execute(bytes) payable returns (bytes)'], wallet);
+const payload = upInterface.encodeFunctionData('execute', [0, targetContract, value, calldata]);
+const tx = await km.execute(payload);
+await tx.wait();
+```
+
+**Gas funding:** The controller EOA must hold ETH on each chain where it needs to execute transactions. There is no way around this — plan for gas costs on Base (~$0.001-0.01 per tx) and Ethereum (~$1-20 per tx depending on network conditions).
 
 ### Limitations
 
 - **Legacy UPs** deployed before LSP23 (via old lsp-factory) won't have deployment events
 - **Address determinism** depends on salt, implementations, and init data being identical
 - The `--verify` flag confirms all base contracts exist on target chains before attempting redeployment
-- **Cross-chain deployment execution** is not yet implemented — the script only retrieves the calldata
+- **No relay on non-LUKSO chains** — all cross-chain execution requires controller-funded gas
 
 ## Error Codes
 
