@@ -6,6 +6,7 @@ import {
   NetworkSelector,
   ConnectionSection,
   ProfileImport,
+  ProfileSearch,
   ControllerInfo,
   PermissionSelector,
   AllowedCallsEditor,
@@ -210,6 +211,11 @@ function App() {
     }
   }, [wallet])
 
+  // Handle profile selection from search
+  const handleProfileSelect = useCallback((address: Address) => {
+    wallet.setKnownUpAddress(address)
+  }, [wallet])
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-lukso-dark">
       <Header />
@@ -223,9 +229,24 @@ function App() {
         />
       </div>
 
+      {/* Profile Search — shown when NOT connected on a non-LUKSO chain and no profile selected yet */}
+      {!wallet.isConnected && !wallet.knownUpAddress && selectedChainId && selectedChainId !== 42 && selectedChainId !== 4201 && (
+        <div className="max-w-2xl mx-auto px-4 pt-4">
+          <div className="card">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+              Find Your Universal Profile
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+              Search by name or paste an address to set your profile for cross-chain import.
+            </p>
+            <ProfileSearch onSelect={handleProfileSelect} />
+          </div>
+        </div>
+      )}
+
       {/* Profile Import — shown when switching chains with a known UP.
           Also shown when NOT connected but extension chain is detected (pendingProfileImport). */}
-      {(wallet.needsProfileImport || wallet.pendingProfileImport) && wallet.knownUpAddress && wallet.originalChainId && (
+      {(wallet.needsProfileImport || wallet.pendingProfileImport || (!wallet.isConnected && wallet.knownUpAddress && wallet.originalChainId && selectedChainId && selectedChainId !== 42 && selectedChainId !== 4201)) && wallet.knownUpAddress && wallet.originalChainId && (
         <div className="max-w-2xl mx-auto px-4 pt-4">
           <ProfileImport
             knownUpAddress={wallet.knownUpAddress}
@@ -235,7 +256,7 @@ function App() {
             onImport={wallet.importProfile}
             onRetryConnect={wallet.connectExtension}
             getProvider={wallet.getProvider}
-            isPendingImport={wallet.pendingProfileImport}
+            isPendingImport={wallet.pendingProfileImport || (!wallet.isConnected && !wallet.pendingProfileImport)}
           />
         </div>
       )}

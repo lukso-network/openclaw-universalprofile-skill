@@ -71,7 +71,7 @@ export function useWallet() {
   const [connectionMethod, setConnectionMethod] = useState<ConnectionMethod>(null)
 
   // === KNOWN UP ADDRESS (persists across chain switches) ===
-  const [knownUpAddress, setKnownUpAddress] = useState<Address | null>(() => {
+  const [knownUpAddress, setKnownUpAddressInternal] = useState<Address | null>(() => {
     const stored = localStorage.getItem(LS_KNOWN_UP_ADDRESS)
     return stored ? (stored as Address) : null
   })
@@ -158,7 +158,7 @@ export function useWallet() {
   // === STORE KNOWN UP ADDRESS on initial connection ===
   useEffect(() => {
     if (isConnected && address && !knownUpAddress) {
-      setKnownUpAddress(address)
+      setKnownUpAddressInternal(address)
       localStorage.setItem(LS_KNOWN_UP_ADDRESS, address)
       if (chainId) {
         setOriginalChainId(chainId)
@@ -178,6 +178,15 @@ export function useWallet() {
       })
     }
   }, [isWcConnected, wagmiWalletClient, wagmiAccount.status, wagmiAccount.chainId, wagmiAccount.address, wagmiWalletClientLoading])
+
+  // === SET KNOWN UP ADDRESS (from external sources like ProfileSearch) ===
+  const setKnownUpAddress = useCallback((addr: Address) => {
+    setKnownUpAddressInternal(addr)
+    localStorage.setItem(LS_KNOWN_UP_ADDRESS, addr)
+    // Always set original chain to LUKSO mainnet since profiles are created there
+    setOriginalChainId(42)
+    localStorage.setItem(LS_ORIGINAL_CHAIN_ID, '42')
+  }, [])
 
   // === SWITCH NETWORK ===
   const switchNetwork = useCallback(async (targetChainId: number) => {
@@ -468,7 +477,7 @@ export function useWallet() {
     }
 
     // Clear known UP address
-    setKnownUpAddress(null)
+    setKnownUpAddressInternal(null)
     setOriginalChainId(null)
     localStorage.removeItem(LS_KNOWN_UP_ADDRESS)
     localStorage.removeItem(LS_ORIGINAL_CHAIN_ID)
@@ -575,6 +584,7 @@ export function useWallet() {
     isWalletConnectAvailable: isWalletConnectConfigured,
     isWalletClientReady: isConnected && walletClient !== null,
     knownUpAddress,
+    setKnownUpAddress,
     originalChainId,
     needsProfileImport,
     pendingProfileImport,
