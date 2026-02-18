@@ -1,6 +1,6 @@
 {
   "name": "openclaw-universalprofile-skill",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Universal Profile skill for Clawdbot - NFT marketplace, DEX trading, token deployment on LUKSO",
   "type": "module",
   "main": "dist/index.js",

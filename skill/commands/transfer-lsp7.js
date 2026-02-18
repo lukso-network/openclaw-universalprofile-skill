@@ -24,12 +24,12 @@ import {
 } from '../lib/tokens/lsp7.js';
 import { 
   buildExecutePayload, 
-  executeRelayCallDirect, 
+  executeDirect,
   executeRelay 
 } from '../lib/execute/index.js';
 import { loadCredentials } from '../lib/credentials.js';
 
-async function transfer(tokenAddress, toAddress, amount, useRelay = false) {
+async function transfer(tokenAddress, toAddress, amount, useRelay = false, options = {}) {
   const creds = loadCredentials();
   const upAddress = creds.universalProfile.address;
 
@@ -82,7 +82,14 @@ async function transfer(tokenAddress, toAddress, amount, useRelay = false) {
   if (useRelay) {
     result = await executeRelay(payload);
   } else {
-    result = await executeRelayCallDirect(payload);
+    // Direct execution: controller calls UP.execute() and pays gas
+    result = await executeDirect(
+      0,             // CALL operation
+      tokenAddress,  // target
+      0,             // value (0)
+      transferData,  // calldata
+      { network: options.network || 'mainnet' }
+    );
   }
 
   console.log('');

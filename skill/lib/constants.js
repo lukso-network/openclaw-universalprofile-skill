@@ -143,22 +143,28 @@ export const CHAINS = {
     name: 'LUKSO',
     rpcUrl: 'https://42.rpc.thirdweb.com',
     explorer: 'https://explorer.lukso.network',
-    currency: {
-      name: 'LYX',
-      symbol: 'LYX',
-      decimals: 18,
-    },
+    currency: { name: 'LYX', symbol: 'LYX', decimals: 18 },
   },
   'lukso-testnet': {
     chainId: 4201,
     name: 'LUKSO Testnet',
     rpcUrl: 'https://rpc.testnet.lukso.network',
     explorer: 'https://explorer.testnet.lukso.network',
-    currency: {
-      name: 'LYXt',
-      symbol: 'LYXt',
-      decimals: 18,
-    },
+    currency: { name: 'LYXt', symbol: 'LYXt', decimals: 18 },
+  },
+  base: {
+    chainId: 8453,
+    name: 'Base',
+    rpcUrl: 'https://mainnet.base.org',
+    explorer: 'https://basescan.org',
+    currency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  },
+  ethereum: {
+    chainId: 1,
+    name: 'Ethereum',
+    rpcUrl: 'https://eth.llamarpc.com',
+    explorer: 'https://etherscan.io',
+    currency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   },
 };
 
@@ -387,27 +393,23 @@ export default {
 };
 
 /**
+ * Resolve explorer base URL from chain ID
+ */
+function getExplorerBase(chainId = 42) {
+  const map = { 42: 'https://explorer.lukso.network', 4201: 'https://explorer.testnet.lukso.network', 8453: 'https://basescan.org', 1: 'https://etherscan.io' };
+  return map[chainId] || map[42];
+}
+
+/**
  * Get explorer URL for a transaction
- * @param {string} txHash - Transaction hash
- * @param {number} chainId - Chain ID (42 for mainnet, 4201 for testnet)
- * @returns {string} Explorer URL
  */
 export function getExplorerUrl(txHash, chainId = 42) {
-  const baseUrl = chainId === 4201 
-    ? 'https://explorer.testnet.lukso.network'
-    : 'https://explorer.lukso.network';
-  return `${baseUrl}/tx/${txHash}`;
+  return `${getExplorerBase(chainId)}/tx/${txHash}`;
 }
 
 /**
  * Get explorer URL for an address
- * @param {string} address - Address
- * @param {number} chainId - Chain ID (42 for mainnet, 4201 for testnet)
- * @returns {string} Explorer URL
  */
 export function getAddressExplorerUrl(address, chainId = 42) {
-  const baseUrl = chainId === 4201 
-    ? 'https://explorer.testnet.lukso.network'
-    : 'https://explorer.lukso.network';
-  return `${baseUrl}/address/${address}`;
+  return `${getExplorerBase(chainId)}/address/${address}`;
 }

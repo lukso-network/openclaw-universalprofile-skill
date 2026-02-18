@@ -1,7 +1,7 @@
 ---
 name: universal-profile
 description: Manage LUKSO Universal Profiles — identity, permissions, tokens, blockchain operations. Cross-chain support for Base and Ethereum.
-version: 0.6.2
+version: 0.7.0
 author: frozeman
 ---
 
@@ -19,15 +19,17 @@ Authorize your bot: create a profile at [my.universalprofile.cloud](https://my.u
 
 ## Execution Models
 
-### Direct (controller pays gas)
+### Direct (all chains — controller pays gas)
 ```
-Controller → KeyManager.execute(payload) → UP.execute(operation, target, value, data) → Target
+Controller → UP.execute(operation, target, value, data) → Target
 ```
+The controller calls `execute()` directly on the UP contract. The UP internally verifies permissions via its KeyManager (LSP20 lsp20VerifyCall). **Do NOT call the KeyManager's execute() function directly.** Always call the UP.
 
 ### Gasless Relay (LUKSO ONLY — chains 42/4201)
 ```
-Controller signs LSP25 → Relayer submits → KeyManager → UP.execute(...)
+Controller signs LSP25 → Relay API submits → KeyManager.executeRelayCall() → UP
 ```
+The controller signs a message, then the LUKSO relay service submits the transaction. **Do NOT call executeRelayCall() yourself — the relay API does this.**
 
 **⚠️ CRITICAL: The relay/gasless option exists ONLY on LUKSO mainnet (42) and testnet (4201). On Base, Ethereum, and all other chains, the controller must hold native ETH and pay gas directly. There is no gasless alternative.**
 
@@ -98,14 +100,18 @@ SUPER variants = unrestricted. Regular = restricted to AllowedCalls/AllowedERC72
 
 ## Transactions
 
-### Direct Execution
+### Direct Execution (all chains)
 ```javascript
-const payload = up.interface.encodeFunctionData('execute', [0, recipient, ethers.parseEther('1.5'), '0x']);
-await (await km.execute(payload)).wait();
+// Controller calls UP.execute() directly — works on LUKSO, Base, Ethereum
+const provider = new ethers.JsonRpcProvider(rpcUrl);  // use correct RPC for chain
+const wallet = new ethers.Wallet(controllerPrivateKey, provider);
+const up = new ethers.Contract(upAddress, ['function execute(uint256,address,uint256,bytes) payable returns (bytes)'], wallet);
+await (await up.execute(0, recipient, ethers.parseEther('0.01'), '0x')).wait();
 ```
 
-### LSP25 Relay Signature (LUKSO only)
-**EIP-191 v0 — do NOT use `signMessage()`:**
+### Gasless Relay (LUKSO only)
+
+**LSP25 Relay Signature — EIP-191 v0, do NOT use `signMessage()`:**
 ```javascript
 const encoded = ethers.solidityPacked(
   ['uint256','uint256','uint256','uint256','uint256','bytes'],
@@ -116,30 +122,18 @@ const msg = new Uint8Array([...prefix, ...ethers.getBytes(kmAddress), ...ethers.
 const signature = ethers.Signature.from(new ethers.SigningKey(privateKey).sign(ethers.keccak256(msg))).serialized;
 ```
 
-### Relay API (LUKSO only)
+**Relay API:**
 ```
 POST https://relayer.mainnet.lukso.network/api/execute
 { "address": "0xUP", "transaction": { "abi": "0xpayload", "signature": "0x...", "nonce": 0, "validityTimestamps": "0x0" } }
 ```
 
+The `payload` for relay calls is the full `UP.execute(...)` calldata. The relay service calls `KeyManager.executeRelayCall()` — you never call the KM directly.
+
+For `setData` via relay, the payload is the `setData(...)` calldata (NOT wrapped in `execute()`).
+
 Nonce channels: `getNonce(controller, channelId)` — same channel = sequential, different = parallel.
 Validity timestamps: `(startTimestamp << 128) | endTimestamp`. Use `0` for no restriction.
-
-### setData via Relay (LUKSO only)
-`setData` payload goes directly to KeyManager — do NOT wrap in `execute()`. The KM forwards to UP automatically.
-
-## Cross-Chain Execution (Base/Ethereum)
-
-On non-LUKSO chains, always use direct execution:
-```javascript
-const provider = new ethers.JsonRpcProvider(rpcUrl);
-const wallet = new ethers.Wallet(controllerPrivateKey, provider);
-const km = new ethers.Contract(kmAddress, ['function execute(bytes) payable returns (bytes)'], wallet);
-const payload = upInterface.encodeFunctionData('execute', [0, target, value, calldata]);
-await (await km.execute(payload)).wait();
-```
-
-Controller must hold ETH on each chain.
 
 ## Cross-Chain Deployment (LSP23)
 

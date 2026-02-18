@@ -1,14 +1,18 @@
 /**
- * Generic Relay Execution (LSP25)
+ * Relay Execution (LSP25) — LUKSO ONLY
  * 
- * Executes ANY payload via LUKSO's relay service (gasless).
- * This module is transaction-type agnostic - it just signs and submits.
+ * Gasless execution via LUKSO's transaction relay service API.
+ * NOT available on Base, Ethereum, or other chains.
+ * 
+ * The controller signs the payload, and the relay service submits the
+ * transaction on-chain. Gas is paid from the UP's relay quota.
+ * 
+ * For non-LUKSO chains, use direct.js (controller pays gas).
  * 
  * REQUIRES:
  * - EXECUTE_RELAY_CALL permission (0x400000)
  * - SIGN permission (0x200000) - for ERC-1271 verification by relayer
- * 
- * The relayer pays gas from the UP's quota.
+ * - Relay quota (check via LUKSO relay API)
  */
 
 import { ethers } from 'ethers';
