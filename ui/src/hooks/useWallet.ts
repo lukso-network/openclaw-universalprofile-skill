@@ -62,6 +62,9 @@ export function useWallet() {
   const [extChainId, setExtChainId] = useState<number | null>(null)
   const [extWalletClient, setExtWalletClient] = useState<WalletClient | null>(null)
 
+  // Chain detected from extension even when connection (eth_requestAccounts) fails
+  const [extensionChainDetected, setExtensionChainDetected] = useState<number | null>(null)
+
   // === SHARED STATE ===
   const [error, setError] = useState<string | null>(null)
   const [profileData, setProfileData] = useState<ProfileData | null>(null)
@@ -124,15 +127,19 @@ export function useWallet() {
       ? (wagmiAccount.chainId ?? null)
       : null
 
+  // Effective chain ID: connected wallet's chain, or detected extension chain as fallback
+  const effectiveChainId = chainId ?? extensionChainDetected
+
   // Public client — always create manually for consistency
+  // Uses effectiveChainId so we can do getCode checks even when not fully connected
   const publicClient = useMemo(() => {
-    if (!chainId) return null
-    const knownChain = getChainById(chainId)
+    if (!effectiveChainId) return null
+    const knownChain = getChainById(effectiveChainId)
     const chain: Chain = knownChain
       ? (knownChain as unknown as Chain)
-      : ({ ...CHAINS.lukso, id: chainId } as unknown as Chain)
+      : ({ ...CHAINS.lukso, id: effectiveChainId } as unknown as Chain)
     return createPublicClient({ chain, transport: http() })
-  }, [chainId])
+  }, [effectiveChainId])
 
   // Wallet client — extension uses manual, WC uses wagmi
   const walletClient = extConnected
@@ -376,13 +383,36 @@ export function useWallet() {
       setExtAddress(accounts[0] as Address)
       setExtChainId(cid)
       setExtWalletClient(wc)
+      setExtensionChainDetected(null) // Clear — full connection succeeded
       manuallyDisconnected.current = false
     } catch (err) {
       console.error('Extension connection error:', err)
+
+      // Connection failed, but try to detect the chain anyway.
+      // The UP may not be imported on this chain yet, but we can still
+      // read the chain ID to guide the user through profile import.
+      try {
+        const chainIdHex = await provider.request({ method: 'eth_chainId' }) as string
+        const cid = parseInt(chainIdHex, 16)
+        if (!isNaN(cid) && cid > 0) {
+          console.log('[useWallet] Connection failed but detected chain:', cid)
+          setExtensionChainDetected(cid)
+          // Don't set a user-facing error if we detected the chain and have a known UP —
+          // the ProfileImport flow will handle it
+          if (knownUpAddress) {
+            setExtConnecting(false)
+            setError(null)
+            return
+          }
+        }
+      } catch (chainErr) {
+        console.error('[useWallet] Could not detect chain after connection failure:', chainErr)
+      }
+
       setExtConnecting(false)
       setError(err instanceof Error ? err.message : 'Failed to connect wallet')
     }
-  }, [getProvider, wagmiAccount.isConnected, wagmiDisconnect])
+  }, [getProvider, wagmiAccount.isConnected, wagmiDisconnect, knownUpAddress])
 
   // === CONNECT WALLETCONNECT ===
   const connectWalletConnect = useCallback(async () => {
@@ -430,6 +460,7 @@ export function useWallet() {
     setExtAddress(null)
     setExtChainId(null)
     setExtWalletClient(null)
+    setExtensionChainDetected(null)
 
     // Disconnect wagmi
     if (wagmiAccount.isConnected) {
@@ -509,7 +540,7 @@ export function useWallet() {
     }
   }, [knownUpAddress, extConnected, publicClient, fetchProfileData])
 
-  // Whether the UI should show the ProfileImport section
+  // Whether the UI should show the ProfileImport section (connected case)
   const needsProfileImport = !!(
     knownUpAddress &&
     isConnected &&
@@ -517,6 +548,17 @@ export function useWallet() {
     chainId &&
     chainId !== originalChainId &&
     address?.toLowerCase() !== knownUpAddress.toLowerCase()
+  )
+
+  // Whether we're in the "not connected but chain detected" import flow.
+  // True when: extension connection failed, we detected a different chain,
+  // and we have a known UP address from a previous session.
+  const pendingProfileImport = !!(
+    !isConnected &&
+    knownUpAddress &&
+    originalChainId &&
+    extensionChainDetected &&
+    extensionChainDetected !== originalChainId
   )
 
   return {
@@ -535,6 +577,9 @@ export function useWallet() {
     knownUpAddress,
     originalChainId,
     needsProfileImport,
+    pendingProfileImport,
+    extensionChainDetected,
+    getProvider,
     connectExtension,
     connectWalletConnect,
     disconnect,

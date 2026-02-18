@@ -195,24 +195,28 @@ function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-lukso-dark">
       <Header />
 
-      {/* Network Selector */}
+      {/* Network Selector — use detected chain as fallback when not connected */}
       <div className="max-w-2xl mx-auto px-4 pt-6">
         <NetworkSelector
-          currentChainId={wallet.chainId}
+          currentChainId={wallet.chainId ?? wallet.extensionChainDetected}
           onSwitch={wallet.switchNetwork}
           isConnected={wallet.isConnected}
         />
       </div>
 
-      {/* Profile Import — shown when switching chains with a known UP */}
-      {wallet.needsProfileImport && wallet.knownUpAddress && wallet.originalChainId && wallet.chainId && (
+      {/* Profile Import — shown when switching chains with a known UP.
+          Also shown when NOT connected but extension chain is detected (pendingProfileImport). */}
+      {(wallet.needsProfileImport || wallet.pendingProfileImport) && wallet.knownUpAddress && wallet.originalChainId && (
         <div className="max-w-2xl mx-auto px-4 pt-4">
           <ProfileImport
             knownUpAddress={wallet.knownUpAddress}
-            currentChainId={wallet.chainId}
+            currentChainId={(wallet.chainId ?? wallet.extensionChainDetected)!}
             originalChainId={wallet.originalChainId}
             checkUpExistsOnChain={wallet.checkUpExistsOnChain}
             onImport={wallet.importProfile}
+            onRetryConnect={wallet.connectExtension}
+            getProvider={wallet.getProvider}
+            isPendingImport={wallet.pendingProfileImport}
           />
         </div>
       )}
@@ -228,8 +232,8 @@ function App() {
           </p>
         </div>
 
-        {/* Step 1: Connect Wallet */}
-        <section>
+        {/* Step 1: Connect Wallet (hidden when pending profile import — ProfileImport takes over) */}
+        {!wallet.pendingProfileImport && <section>
           <StepHeader number={1} title="Connect Your Universal Profile" />
           <ConnectionSection
             isConnected={wallet.isConnected}
@@ -244,7 +248,7 @@ function App() {
             onConnectWalletConnect={wallet.connectWalletConnect}
             onDisconnect={wallet.disconnect}
           />
-        </section>
+        </section>}
 
         {/* Step 2: Controller Address */}
         {wallet.isConnected && (

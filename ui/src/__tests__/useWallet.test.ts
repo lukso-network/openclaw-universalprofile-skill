@@ -72,6 +72,7 @@ function setWindowProvider(provider: typeof mockProvider | null) {
 describe('useWallet', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     mockWagmiAccount.isConnected = false
     mockWagmiAccount.isConnecting = false
     mockWagmiAccount.address = undefined
@@ -161,6 +162,7 @@ describe('useWallet', () => {
     it('sets error when provider returns no accounts', async () => {
       mockProvider.request
         .mockResolvedValueOnce([]) // empty accounts
+        .mockResolvedValueOnce('0x2a') // eth_chainId fallback
 
       const { result } = await getHook()
 
@@ -173,7 +175,9 @@ describe('useWallet', () => {
     })
 
     it('handles provider request rejection', async () => {
-      mockProvider.request.mockRejectedValueOnce(new Error('User rejected'))
+      mockProvider.request
+        .mockRejectedValueOnce(new Error('User rejected'))
+        .mockResolvedValueOnce('0x2a') // eth_chainId fallback
 
       const { result } = await getHook()
 
@@ -184,6 +188,27 @@ describe('useWallet', () => {
       expect(result.current.isConnected).toBe(false)
       expect(result.current.error).toBe('User rejected')
       expect(result.current.isConnecting).toBe(false)
+    })
+
+    it('detects chain and suppresses error when knownUpAddress exists', async () => {
+      // Simulate a known UP address from a previous session
+      localStorage.setItem('openclaw_known_up_address', '0x1234567890abcdef1234567890abcdef12345678')
+      localStorage.setItem('openclaw_original_chain_id', '42')
+
+      mockProvider.request
+        .mockRejectedValueOnce(new Error('No accounts returned'))
+        .mockResolvedValueOnce('0x2105') // Base chain ID (8453)
+
+      const { result } = await getHook()
+
+      await act(async () => {
+        await result.current.connectExtension()
+      })
+
+      expect(result.current.isConnected).toBe(false)
+      expect(result.current.error).toBeNull()
+      expect(result.current.extensionChainDetected).toBe(8453)
+      expect(result.current.pendingProfileImport).toBe(true)
     })
 
     it('disconnects wagmi if wagmi was connected', async () => {
@@ -389,6 +414,9 @@ describe('useWallet', () => {
       expect(keys).toContain('disconnect')
       expect(keys).toContain('switchNetwork')
       expect(keys).toContain('refetchProfile')
+      expect(keys).toContain('pendingProfileImport')
+      expect(keys).toContain('extensionChainDetected')
+      expect(keys).toContain('getProvider')
     })
   })
 })
