@@ -12,10 +12,13 @@ const mockWagmiAccount = {
 }
 const mockWagmiWalletClient = { data: undefined }
 
+const mockSwitchChain = vi.fn()
+
 vi.mock('wagmi', () => ({
   useAccount: () => mockWagmiAccount,
   useDisconnect: () => ({ disconnect: mockWagmiDisconnect }),
   useWalletClient: () => mockWagmiWalletClient,
+  useSwitchChain: () => ({ switchChain: mockSwitchChain }),
 }))
 
 // --- AppKit mock ---
@@ -384,6 +387,7 @@ describe('useWallet', () => {
       expect(keys).toContain('connectExtension')
       expect(keys).toContain('connectWalletConnect')
       expect(keys).toContain('disconnect')
+      expect(keys).toContain('switchNetwork')
       expect(keys).toContain('refetchProfile')
     })
   })

@@ -40,8 +40,32 @@ export const luksoTestnetNetwork: AppKitNetwork = {
   },
 }
 
+export const baseNetwork: AppKitNetwork = {
+  id: 8453,
+  name: 'Base',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://mainnet.base.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'BaseScan', url: 'https://basescan.org' },
+  },
+}
+
+export const ethereumNetwork: AppKitNetwork = {
+  id: 1,
+  name: 'Ethereum',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://eth.llamarpc.com'] },
+  },
+  blockExplorers: {
+    default: { name: 'Etherscan', url: 'https://etherscan.io' },
+  },
+}
+
 // All supported networks
-export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [luksoMainnet, luksoTestnetNetwork]
+export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [luksoMainnet, baseNetwork, ethereumNetwork, luksoTestnetNetwork]
 
 // Create Wagmi adapter
 export const wagmiAdapter = new WagmiAdapter({

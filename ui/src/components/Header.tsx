@@ -33,12 +33,6 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Network indicator */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="text-sm font-medium">LUKSO</span>
-          </div>
-
           {/* Dark mode toggle */}
           <button
             onClick={toggleDarkMode}

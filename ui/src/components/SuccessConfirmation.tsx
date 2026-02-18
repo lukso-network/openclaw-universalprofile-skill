@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CHAINS } from '../constants'
+import { getChainById } from '../constants'
 import { formatAddress } from '../utils'
 import type { Hex, Address } from 'viem'
 
@@ -21,10 +21,9 @@ export function SuccessConfirmation({
   const [copied, setCopied] = useState<string | null>(null)
 
   const getExplorerUrl = () => {
-    if (chainId === 42) {
-      return `${CHAINS.lukso.blockExplorers.default.url}/tx/${txHash}`
-    } else if (chainId === 4201) {
-      return `${CHAINS.luksoTestnet.blockExplorers.default.url}/tx/${txHash}`
+    const chain = getChainById(chainId)
+    if (chain) {
+      return `${chain.blockExplorers.default.url}/tx/${txHash}`
     }
     return `https://explorer.execution.mainnet.lukso.network/tx/${txHash}`
   }
@@ -34,6 +33,11 @@ export function SuccessConfirmation({
       return `https://universalprofile.cloud/${upAddress}`
     } else if (chainId === 4201) {
       return `https://universalprofile.cloud/testnet/${upAddress}`
+    }
+    // For Base/Ethereum, link to the explorer address page
+    const chain = getChainById(chainId)
+    if (chain) {
+      return `${chain.blockExplorers.default.url}/address/${upAddress}`
     }
     return `https://universalprofile.cloud/${upAddress}`
   }

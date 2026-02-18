@@ -10,8 +10,8 @@ import {
   type Hex,
   type Chain
 } from 'viem'
-import { useAccount, useDisconnect, useWalletClient as useWagmiWalletClient } from 'wagmi'
-import { CHAINS, LSP0_ABI, DATA_KEYS } from '../constants'
+import { useAccount, useDisconnect, useWalletClient as useWagmiWalletClient, useSwitchChain } from 'wagmi'
+import { CHAINS, LSP0_ABI, DATA_KEYS, getChainById } from '../constants'
 import { convertIpfsUrl, fetchProfileFromIndexer } from '../utils'
 import { isWalletConnectConfigured } from '../lib/walletConfig'
 import { getAppKitModal } from '../providers/WalletProvider'
@@ -49,6 +49,7 @@ export function useWallet() {
   const wagmiAccount = useAccount()
   const { data: wagmiWalletClient, isLoading: wagmiWalletClientLoading } = useWagmiWalletClient()
   const { disconnect: wagmiDisconnect } = useDisconnect()
+  const { switchChain: wagmiSwitchChain } = useSwitchChain()
 
   // === EXTENSION STATE ===
   const [extConnected, setExtConnected] = useState(false)
@@ -112,14 +113,10 @@ export function useWallet() {
   // Public client — always create manually for consistency
   const publicClient = useMemo(() => {
     if (!chainId) return null
-    let chain: Chain
-    if (chainId === 42) {
-      chain = CHAINS.lukso as unknown as Chain
-    } else if (chainId === 4201) {
-      chain = CHAINS.luksoTestnet as unknown as Chain
-    } else {
-      chain = { ...CHAINS.lukso, id: chainId } as unknown as Chain
-    }
+    const knownChain = getChainById(chainId)
+    const chain: Chain = knownChain
+      ? (knownChain as unknown as Chain)
+      : ({ ...CHAINS.lukso, id: chainId } as unknown as Chain)
     return createPublicClient({ chain, transport: http() })
   }, [chainId])
 
@@ -149,6 +146,50 @@ export function useWallet() {
     }
   }, [isWcConnected, wagmiWalletClient, wagmiAccount.status, wagmiAccount.chainId, wagmiAccount.address, wagmiWalletClientLoading])
 
+  // === SWITCH NETWORK ===
+  const switchNetwork = useCallback(async (targetChainId: number) => {
+    if (extConnected) {
+      // Extension path: use provider's wallet_switchEthereumChain
+      const provider = getProvider()
+      if (!provider) return
+      const hexChainId = `0x${targetChainId.toString(16)}`
+      try {
+        await provider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: hexChainId }],
+        })
+      } catch (err: unknown) {
+        // 4902 = chain not added to wallet, try adding it
+        if (err && typeof err === 'object' && 'code' in err && (err as { code: number }).code === 4902) {
+          const chainConfig = getChainById(targetChainId)
+          if (chainConfig) {
+            await provider.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: hexChainId,
+                chainName: chainConfig.name,
+                nativeCurrency: chainConfig.nativeCurrency,
+                rpcUrls: chainConfig.rpcUrls.default.http,
+                blockExplorerUrls: [chainConfig.blockExplorers.default.url],
+              }],
+            })
+          }
+        } else {
+          console.error('Failed to switch network:', err)
+          setError(err instanceof Error ? err.message : 'Failed to switch network')
+        }
+      }
+    } else if (isWcConnected && wagmiSwitchChain) {
+      // WalletConnect path: use wagmi's switchChain
+      try {
+        wagmiSwitchChain({ chainId: targetChainId })
+      } catch (err) {
+        console.error('Failed to switch network:', err)
+        setError(err instanceof Error ? err.message : 'Failed to switch network')
+      }
+    }
+  }, [extConnected, isWcConnected, getProvider, wagmiSwitchChain])
+
   // === PROFILE FETCHING ===
   const fetchProfileData = useCallback(async (addr: Address, pc: PublicClient) => {
     try {
@@ -175,15 +216,18 @@ export function useWallet() {
       let profileDescription: string | undefined
       let profileImage: string | undefined
 
-      // Try indexer first (returns pre-resolved HTTP image URLs)
-      try {
-        const indexerProfile = await fetchProfileFromIndexer(addr)
-        if (indexerProfile) {
-          profileName = indexerProfile.name || undefined
-          profileImage = indexerProfile.profileImageUrl || undefined
+      // Try LUKSO indexer first (only available for LUKSO chains)
+      const pcChainId = pc.chain?.id
+      if (pcChainId === 42 || pcChainId === 4201) {
+        try {
+          const indexerProfile = await fetchProfileFromIndexer(addr)
+          if (indexerProfile) {
+            profileName = indexerProfile.name || undefined
+            profileImage = indexerProfile.profileImageUrl || undefined
+          }
+        } catch (err) {
+          console.error('Indexer fetch failed, falling back to on-chain:', err)
         }
-      } catch (err) {
-        console.error('Indexer fetch failed, falling back to on-chain:', err)
       }
 
       // Fallback: parse LSP3 on-chain data if indexer didn't return an image
@@ -290,14 +334,10 @@ export function useWallet() {
       const cid = parseInt(chainIdHex, 16)
 
       // Determine chain config
-      let chain: Chain
-      if (cid === 42) {
-        chain = CHAINS.lukso as unknown as Chain
-      } else if (cid === 4201) {
-        chain = CHAINS.luksoTestnet as unknown as Chain
-      } else {
-        chain = { ...CHAINS.lukso, id: cid } as unknown as Chain
-      }
+      const knownChain = getChainById(cid)
+      const chain: Chain = knownChain
+        ? (knownChain as unknown as Chain)
+        : ({ ...CHAINS.lukso, id: cid } as unknown as Chain)
 
       // Create wallet client
       const wc = createWalletClient({
@@ -423,6 +463,7 @@ export function useWallet() {
     connectExtension,
     connectWalletConnect,
     disconnect,
+    switchNetwork,
     refetchProfile: () => {
       if (address && publicClient) {
         fetchProfileData(address, publicClient)

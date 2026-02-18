@@ -3,6 +3,7 @@ import { version } from '../package.json'
 import type { Address } from 'viem'
 import {
   Header,
+  NetworkSelector,
   ConnectionSection,
   ControllerInfo,
   PermissionSelector,
@@ -16,7 +17,7 @@ import { useWallet } from './hooks/useWallet'
 import { useAuthorization } from './hooks/useAuthorization'
 import { parseUrlParams, findMatchingPreset, decodePermissions, convertEntriesToAllowedCalls } from './utils'
 import type { AllowedCallEntry, DataKeyEntry } from './utils'
-import { PERMISSION_PRESETS, PERMISSION_NAMES, PERMISSIONS } from './constants'
+import { PERMISSION_PRESETS, PERMISSION_NAMES, PERMISSIONS, getChainById } from './constants'
 import type { Hex } from 'viem'
 
 function App() {
@@ -185,10 +186,23 @@ function App() {
     /^0x[a-fA-F0-9]{40}$/.test(controllerAddress) &&
     permissions > 0n
 
+  const currentChainName = wallet.chainId
+    ? (getChainById(wallet.chainId)?.name ?? 'Unknown Network')
+    : 'LUKSO'
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-lukso-dark">
       <Header />
-      
+
+      {/* Network Selector */}
+      <div className="max-w-2xl mx-auto px-4 pt-6">
+        <NetworkSelector
+          currentChainId={wallet.chainId}
+          onSwitch={wallet.switchNetwork}
+          isConnected={wallet.isConnected}
+        />
+      </div>
+
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         {/* Introduction */}
         <div className="text-center mb-8">
@@ -196,7 +210,7 @@ function App() {
             Authorize OpenClaw
           </h1>
           <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-            Grant OpenClaw permission to interact with your Universal Profile on LUKSO
+            Grant OpenClaw permission to interact with your Universal Profile on {currentChainName}
           </p>
         </div>
 
@@ -391,7 +405,7 @@ function getFriendlyError(raw: string): { friendly: string; isWarning: boolean }
     return { friendly: 'Transaction was cancelled. You can try again when ready.', isWarning: true }
   }
   if (raw.includes('insufficient funds') || raw.includes('Insufficient funds')) {
-    return { friendly: 'Your account doesn\'t have enough LYX to pay for gas fees.', isWarning: false }
+    return { friendly: 'Your account doesn\'t have enough native tokens to pay for gas fees.', isWarning: false }
   }
   if (raw.includes('not the owner')) {
     return { friendly: 'You are not the owner of this Universal Profile. Only the owner can manage controller permissions.', isWarning: false }

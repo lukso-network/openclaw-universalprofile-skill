@@ -183,7 +183,38 @@ export const CHAINS = {
       default: { name: 'LUKSO Testnet Explorer', url: 'https://explorer.execution.testnet.lukso.network' },
     },
   },
+  base: {
+    id: 8453,
+    name: 'Base',
+    network: 'base',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrls: {
+      default: { http: ['https://mainnet.base.org'] },
+      public: { http: ['https://mainnet.base.org'] },
+    },
+    blockExplorers: {
+      default: { name: 'BaseScan', url: 'https://basescan.org' },
+    },
+  },
+  ethereum: {
+    id: 1,
+    name: 'Ethereum',
+    network: 'ethereum',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrls: {
+      default: { http: ['https://eth.llamarpc.com'] },
+      public: { http: ['https://eth.llamarpc.com'] },
+    },
+    blockExplorers: {
+      default: { name: 'Etherscan', url: 'https://etherscan.io' },
+    },
+  },
 } as const
+
+/** Look up chain config by chainId, returns undefined if unknown */
+export function getChainById(chainId: number) {
+  return Object.values(CHAINS).find(c => c.id === chainId)
+}
 
 // AllowedCalls call type bitmap values
 export const CALL_TYPES = {

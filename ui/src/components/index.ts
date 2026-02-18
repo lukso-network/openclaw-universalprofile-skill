@@ -1,4 +1,5 @@
 export { Header } from './Header'
+export { NetworkSelector } from './NetworkSelector'
 export { ConnectionSection } from './ConnectionSection'
 export { ControllerInfo } from './ControllerInfo'
 export { PermissionSelector } from './PermissionSelector'

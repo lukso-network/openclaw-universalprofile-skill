@@ -58,16 +58,48 @@ describe('walletConfig', () => {
   })
 
   describe('networks array', () => {
-    it('contains both mainnet and testnet', async () => {
+    it('contains all supported networks', async () => {
       const { networks } = await import('../lib/walletConfig')
-      expect(networks).toHaveLength(2)
-      expect(networks[0].id).toBe(42)
-      expect(networks[1].id).toBe(4201)
+      expect(networks).toHaveLength(4)
+      expect(networks[0].id).toBe(42)    // LUKSO
+      expect(networks[1].id).toBe(8453)  // Base
+      expect(networks[2].id).toBe(1)     // Ethereum
+      expect(networks[3].id).toBe(4201)  // LUKSO Testnet
     })
 
-    it('has mainnet as first entry', async () => {
+    it('has LUKSO mainnet as first entry', async () => {
       const { networks, luksoMainnet } = await import('../lib/walletConfig')
       expect(networks[0]).toBe(luksoMainnet)
+    })
+  })
+
+  describe('base and ethereum chain configurations', () => {
+    it('baseNetwork has chain ID 8453', async () => {
+      const { baseNetwork } = await import('../lib/walletConfig')
+      expect(baseNetwork.id).toBe(8453)
+    })
+
+    it('ethereumNetwork has chain ID 1', async () => {
+      const { ethereumNetwork } = await import('../lib/walletConfig')
+      expect(ethereumNetwork.id).toBe(1)
+    })
+
+    it('baseNetwork has ETH native currency', async () => {
+      const { baseNetwork } = await import('../lib/walletConfig')
+      expect(baseNetwork.nativeCurrency).toEqual({
+        name: 'Ether',
+        symbol: 'ETH',
+        decimals: 18,
+      })
+    })
+
+    it('ethereumNetwork has ETH native currency', async () => {
+      const { ethereumNetwork } = await import('../lib/walletConfig')
+      expect(ethereumNetwork.nativeCurrency).toEqual({
+        name: 'Ether',
+        symbol: 'ETH',
+        decimals: 18,
+      })
     })
   })
 
