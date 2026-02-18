@@ -159,15 +159,8 @@ export function ProfileImport({
             {showManualInstructions && (
               <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 space-y-2">
                 <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                  Import your profile manually in the UP extension:
+                  Confirm the import profile in the Universal Profile Extension.
                 </p>
-                <ol className="text-sm text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1">
-                  <li>Open the UP Browser Extension</li>
-                  <li>Go to Settings or Profile Management</li>
-                  <li>Select "Import Profile" or "Add Account"</li>
-                  <li>Enter your address: <span className="font-mono text-xs">{formatAddress(knownUpAddress, 8)}</span></li>
-                  <li>Complete the import process</li>
-                </ol>
                 <button
                   onClick={handleRetryAfterManualImport}
                   disabled={importing}
