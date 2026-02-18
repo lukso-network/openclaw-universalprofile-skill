@@ -16,7 +16,7 @@ interface ProfileImportProps {
   onImport: () => void
   /** Retry connecting the extension after a successful import */
   onRetryConnect?: () => Promise<void>
-  /** Get the raw extension provider for wallet_importProfile calls */
+  /** Get the raw extension provider for up_import calls */
   getProvider?: () => UPProvider | null
   /** True when in the "not connected but chain detected" flow */
   isPendingImport?: boolean
@@ -59,7 +59,7 @@ export function ProfileImport({
   }, [checkUpExistsOnChain])
 
   const handleImport = useCallback(async () => {
-    // If we're in the pending import flow (not connected), try wallet_importProfile first
+    // If we're in the pending import flow (not connected), try up_import first
     if (isPendingImport && getProvider) {
       setImporting(true)
       setImportError(null)
@@ -68,12 +68,12 @@ export function ProfileImport({
       const provider = getProvider()
       if (provider) {
         try {
-          // Try the UP extension's wallet_importProfile method
+          // Try the UP extension's up_import method
           await provider.request({
-            method: 'wallet_importProfile',
+            method: 'up_import',
             params: [knownUpAddress],
           })
-          console.log('[ProfileImport] wallet_importProfile succeeded')
+          console.log('[ProfileImport] up_import succeeded')
 
           // Import succeeded — retry the full extension connection
           if (onRetryConnect) {
@@ -82,7 +82,7 @@ export function ProfileImport({
           setImporting(false)
           return
         } catch (err) {
-          console.warn('[ProfileImport] wallet_importProfile not supported or failed:', err)
+          console.warn('[ProfileImport] up_import not supported or failed:', err)
           // Method not supported — show manual instructions
           setShowManualInstructions(true)
           setImporting(false)
