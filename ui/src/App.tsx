@@ -5,6 +5,7 @@ import {
   Header,
   NetworkSelector,
   ConnectionSection,
+  ProfileImport,
   ControllerInfo,
   PermissionSelector,
   AllowedCallsEditor,
@@ -202,6 +203,19 @@ function App() {
           isConnected={wallet.isConnected}
         />
       </div>
+
+      {/* Profile Import — shown when switching chains with a known UP */}
+      {wallet.needsProfileImport && wallet.knownUpAddress && wallet.originalChainId && wallet.chainId && (
+        <div className="max-w-2xl mx-auto px-4 pt-4">
+          <ProfileImport
+            knownUpAddress={wallet.knownUpAddress}
+            currentChainId={wallet.chainId}
+            originalChainId={wallet.originalChainId}
+            checkUpExistsOnChain={wallet.checkUpExistsOnChain}
+            onImport={wallet.importProfile}
+          />
+        </div>
+      )}
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         {/* Introduction */}

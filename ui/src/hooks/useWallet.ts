@@ -16,6 +16,10 @@ import { convertIpfsUrl, fetchProfileFromIndexer } from '../utils'
 import { isWalletConnectConfigured } from '../lib/walletConfig'
 import { getAppKitModal } from '../providers/WalletProvider'
 
+// localStorage keys for persisting UP address across chain-change reloads
+const LS_KNOWN_UP_ADDRESS = 'openclaw_known_up_address'
+const LS_ORIGINAL_CHAIN_ID = 'openclaw_original_chain_id'
+
 // Type for UP Provider
 interface UPProvider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
@@ -62,6 +66,16 @@ export function useWallet() {
   const [error, setError] = useState<string | null>(null)
   const [profileData, setProfileData] = useState<ProfileData | null>(null)
   const [connectionMethod, setConnectionMethod] = useState<ConnectionMethod>(null)
+
+  // === KNOWN UP ADDRESS (persists across chain switches) ===
+  const [knownUpAddress, setKnownUpAddress] = useState<Address | null>(() => {
+    const stored = localStorage.getItem(LS_KNOWN_UP_ADDRESS)
+    return stored ? (stored as Address) : null
+  })
+  const [originalChainId, setOriginalChainId] = useState<number | null>(() => {
+    const stored = localStorage.getItem(LS_ORIGINAL_CHAIN_ID)
+    return stored ? parseInt(stored, 10) : null
+  })
 
   // Prevent wagmi auto-reconnect — start disconnected, require explicit connect
   const manuallyDisconnected = useRef(true)
@@ -133,6 +147,18 @@ export function useWallet() {
     else if (isWcConnected) setConnectionMethod('walletconnect')
     else setConnectionMethod(null)
   }, [extConnected, isWcConnected])
+
+  // === STORE KNOWN UP ADDRESS on initial connection ===
+  useEffect(() => {
+    if (isConnected && address && !knownUpAddress) {
+      setKnownUpAddress(address)
+      localStorage.setItem(LS_KNOWN_UP_ADDRESS, address)
+      if (chainId) {
+        setOriginalChainId(chainId)
+        localStorage.setItem(LS_ORIGINAL_CHAIN_ID, chainId.toString())
+      }
+    }
+  }, [isConnected, address, chainId, knownUpAddress])
 
   // === DEBUG: WalletConnect client readiness ===
   useEffect(() => {
@@ -410,6 +436,12 @@ export function useWallet() {
       wagmiDisconnect()
     }
 
+    // Clear known UP address
+    setKnownUpAddress(null)
+    setOriginalChainId(null)
+    localStorage.removeItem(LS_KNOWN_UP_ADDRESS)
+    localStorage.removeItem(LS_ORIGINAL_CHAIN_ID)
+
     setProfileData(null)
     setError(null)
     setConnectionMethod(null)
@@ -434,7 +466,13 @@ export function useWallet() {
     }
 
     const handleChainChanged = () => {
-      // Reload the page on chain change for simplicity
+      // Persist known UP address before reload so it survives the chain switch
+      if (knownUpAddress) {
+        localStorage.setItem(LS_KNOWN_UP_ADDRESS, knownUpAddress)
+      }
+      if (originalChainId) {
+        localStorage.setItem(LS_ORIGINAL_CHAIN_ID, originalChainId.toString())
+      }
       window.location.reload()
     }
 
@@ -445,7 +483,41 @@ export function useWallet() {
       provider.removeListener('accountsChanged', handleAccountsChanged)
       provider.removeListener('chainChanged', handleChainChanged)
     }
-  }, [extConnected, getProvider, disconnect, publicClient, fetchProfileData])
+  }, [extConnected, getProvider, disconnect, publicClient, fetchProfileData, knownUpAddress, originalChainId])
+
+  // === PROFILE IMPORT: check if UP exists on current chain ===
+  const checkUpExistsOnChain = useCallback(async (): Promise<boolean> => {
+    if (!knownUpAddress || !publicClient) return false
+    try {
+      const code = await publicClient.getCode({ address: knownUpAddress })
+      return !!code && code !== '0x'
+    } catch (err) {
+      console.error('[useWallet] getCode check failed:', err)
+      return false
+    }
+  }, [knownUpAddress, publicClient])
+
+  // Import the known UP as the active address for this chain
+  const importProfile = useCallback(() => {
+    if (!knownUpAddress) return
+    if (extConnected) {
+      setExtAddress(knownUpAddress)
+    }
+    // Trigger profile re-fetch for the imported address
+    if (publicClient) {
+      fetchProfileData(knownUpAddress, publicClient)
+    }
+  }, [knownUpAddress, extConnected, publicClient, fetchProfileData])
+
+  // Whether the UI should show the ProfileImport section
+  const needsProfileImport = !!(
+    knownUpAddress &&
+    isConnected &&
+    originalChainId &&
+    chainId &&
+    chainId !== originalChainId &&
+    address?.toLowerCase() !== knownUpAddress.toLowerCase()
+  )
 
   return {
     isConnected,
@@ -460,10 +532,15 @@ export function useWallet() {
     isExtensionAvailable,
     isWalletConnectAvailable: isWalletConnectConfigured,
     isWalletClientReady: isConnected && walletClient !== null,
+    knownUpAddress,
+    originalChainId,
+    needsProfileImport,
     connectExtension,
     connectWalletConnect,
     disconnect,
     switchNetwork,
+    checkUpExistsOnChain,
+    importProfile,
     refetchProfile: () => {
       if (address && publicClient) {
         fetchProfileData(address, publicClient)
