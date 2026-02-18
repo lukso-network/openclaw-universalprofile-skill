@@ -28,6 +28,17 @@ function App() {
   // Wallet state
   const wallet = useWallet()
   
+  // Pre-connection chain selection (allows switching before connecting)
+  const [selectedChainId, setSelectedChainId] = useState<number | null>(null)
+  
+  // Sync selectedChainId when wallet connects or chain changes
+  const walletChainId = wallet.chainId ?? wallet.extensionChainDetected
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (walletChainId) setSelectedChainId(walletChainId) }, [walletChainId])
+  
+  // The effective chain ID for display purposes
+  const effectiveChainId = walletChainId ?? selectedChainId
+  
   // Controller address state
   const [controllerAddress, setControllerAddress] = useState<Address | null>(
     urlParams.controllerAddress || null
@@ -187,19 +198,27 @@ function App() {
     /^0x[a-fA-F0-9]{40}$/.test(controllerAddress) &&
     permissions > 0n
 
-  const currentChainName = wallet.chainId
-    ? (getChainById(wallet.chainId)?.name ?? 'Unknown Network')
+  const currentChainName = effectiveChainId
+    ? (getChainById(effectiveChainId)?.name ?? 'Unknown Network')
     : 'LUKSO'
+
+  // Handle network switch — works both pre and post connection
+  const handleNetworkSwitch = useCallback((chainId: number) => {
+    setSelectedChainId(chainId)
+    if (wallet.isConnected) {
+      wallet.switchNetwork(chainId)
+    }
+  }, [wallet])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-lukso-dark">
       <Header />
 
-      {/* Network Selector — use detected chain as fallback when not connected */}
+      {/* Network Selector — always interactive, even before connecting */}
       <div className="max-w-2xl mx-auto px-4 pt-6">
         <NetworkSelector
-          currentChainId={wallet.chainId ?? wallet.extensionChainDetected}
-          onSwitch={wallet.switchNetwork}
+          currentChainId={effectiveChainId}
+          onSwitch={handleNetworkSwitch}
           isConnected={wallet.isConnected}
         />
       </div>
@@ -210,7 +229,7 @@ function App() {
         <div className="max-w-2xl mx-auto px-4 pt-4">
           <ProfileImport
             knownUpAddress={wallet.knownUpAddress}
-            currentChainId={(wallet.chainId ?? wallet.extensionChainDetected)!}
+            currentChainId={effectiveChainId!}
             originalChainId={wallet.originalChainId}
             checkUpExistsOnChain={wallet.checkUpExistsOnChain}
             onImport={wallet.importProfile}
