@@ -192,22 +192,58 @@ const followData = lsp26Iface.encodeFunctionData('follow', [targetAddress]);
 
 ## VerifiableURI (LSP2)
 
-Format: `0x` + `00006f357c6a0020` (8-byte header) + `keccak256hash` (32 bytes) + `url as UTF-8 hex`
+⚠️ **IMPORTANT: The format described below (with hashLength) does NOT work with the LUKSO wallet.**
 
-Header = verificationMethod(2) + hashFunction(4=keccak256(utf8)) + hashLength(2=0x0020).
+The wallet expects the **legacy format** (without hashLength):
 
-Decoding: skip 80 hex chars (2 + 8 + 4 + 64 + 2 prefix), rest = UTF-8 URL.
+```
+0x + hashFunction (4 bytes) + keccak256(json) (32 bytes) + url (UTF-8 hex)
+= 89 bytes for ipfs://Qm... URLs
+```
 
-**Common mistakes:** forgetting `0020` hash length bytes, not pinning IPFS before on-chain tx, hash mismatch from re-serialization.
+### Legacy Format (WORKS)
+
+```javascript
+const hashFunction = "6f357c6a"; // keccak256(utf8)
+
+// 1. Upload JSON to IPFS and get CID
+const cid = "Qm..."; 
+const url = "ipfs://" + cid;
+
+// 2. Fetch EXACT content from IPFS (important!)
+const jsonFromIPFS = await fetch("https://gateway.pinata.cloud/ipfs/" + cid);
+
+// 3. Compute hash of exact content
+const jsonHash = ethers.keccak256(ethers.toUtf8Bytes(jsonFromIPFS));
+
+// 4. Build VerifiableURI (legacy format - 89 bytes)
+const urlHex = ethers.hexlify(ethers.toUtf8Bytes(url)).slice(2);
+const verifiableUri = "0x" + hashFunction + jsonHash.slice(2) + urlHex;
+```
+
+**Result:** 89 bytes total
+
+### Old Format (DOES NOT WORK)
+
+The documentation previously showed this format with hashLength:
+
+```
+Header = verificationMethod(2) + hashFunction(4=keccak256(utf8)) + hashLength(2=0x0020)
+```
+
+**This produces ~106 bytes and the hash verification fails.** Do not use.
 
 ### LSP3 Profile Update Procedure
 1. Read current: `getData(0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5)` → decode VerifiableURI → fetch JSON
 2. Modify JSON
 3. Use `{ verification: { method: "keccak256(bytes)", data: "0x..." }, url: "ipfs://..." }` for images
-4. Pin images + JSON to IPFS, verify accessible via gateway
-5. Compute `keccak256(exactJsonBytes)`, encode VerifiableURI
-6. `setData(LSP3_KEY, verifiableUri)` from controller
-7. Verify: read back, decode, fetch, confirm
+4. **Pin JSON to IPFS, verify accessible via gateway**
+5. **Fetch exact content from IPFS** (not your local JSON - must match what's on IPFS)
+6. Compute `keccak256(exactJsonBytes)`, encode using legacy format (see above)
+7. `setData(LSP3_KEY, verifiableUri)` from controller
+8. Verify: read back, decode, fetch, confirm
+
+**Critical:** The hash must be computed from the exact bytes returned by IPFS, not from your original JSON string. JSON.stringify can add whitespace differences.
 
 LSP3 key: `0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5`
 LSP28 key: `0x724141d9918ce69e6b8afcf53a91748466086ba2c74b94cab43c649ae2ac23ff`
