@@ -1,11 +1,14 @@
 {
   "name": "skill-universal-profile",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Universal Profile skill for OpenClaw — LUKSO blockchain identity, permissions, tokens, and gasless relay transactions",
   "main": "index.js",
+  "bin": {
+    "up": "index.js"
+  },
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "node --test tests/*.test.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "audit": "npm audit"
@@ -22,7 +25,6 @@
   "author": "frozeman",
   "license": "MIT",
   "dependencies": {
-    "@lukso/eip191-signer.js": "^0.2.5",
     "ethers": "^6.9.0",
     "viem": "^2.45.1"
   },
@@ -36,6 +38,7 @@
   "files": [
     "index.js",
     "lib/**/*.js",
+    "commands/**/*.js",
     "SKILL.md"
   ]
 }
