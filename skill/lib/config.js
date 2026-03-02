@@ -24,7 +24,7 @@ const DEFAULT_CONFIG = {
  */
 export function getConfigDir() {
   const home = os.homedir();
-  return path.join(home, '.clawdbot', 'skills', 'universal-profile');
+  return path.join(home, '.openclaw', 'skills', 'universal-profile');
 }
 
 /**
@@ -63,13 +63,13 @@ async function ensureConfigDir() {
  */
 export async function loadConfig() {
   await ensureConfigDir();
-  
+
   const configPath = getConfigPath();
-  
+
   try {
     const data = await fs.readFile(configPath, 'utf8');
     const config = JSON.parse(data);
-    
+
     // Merge with defaults for any missing keys
     return {
       ...DEFAULT_CONFIG,
@@ -98,10 +98,10 @@ export async function loadConfig() {
  */
 export async function saveConfig(config) {
   await ensureConfigDir();
-  
+
   const configPath = getConfigPath();
   const data = JSON.stringify(config, null, 2);
-  
+
   await fs.writeFile(configPath, data, 'utf8');
 }
 
@@ -131,20 +131,20 @@ export async function setConfigValue(key, value) {
   }
 
   const config = await loadConfig();
-  
+
   // Support dot notation (e.g., "chains.lukso.rpcUrl")
   const keys = key.split('.');
   let target = config;
-  
+
   for (let i = 0; i < keys.length - 1; i++) {
     if (!(keys[i] in target)) {
       target[keys[i]] = {};
     }
     target = target[keys[i]];
   }
-  
+
   target[keys[keys.length - 1]] = value;
-  
+
   await saveConfig(config);
   return config;
 }
@@ -157,10 +157,10 @@ export async function setConfigValue(key, value) {
  */
 export async function getConfigValue(key, defaultValue = undefined) {
   const config = await loadConfig();
-  
+
   const keys = key.split('.');
   let value = config;
-  
+
   for (const k of keys) {
     if (value && typeof value === 'object' && k in value) {
       value = value[k];
@@ -168,7 +168,7 @@ export async function getConfigValue(key, defaultValue = undefined) {
       return defaultValue;
     }
   }
-  
+
   return value;
 }
 
@@ -189,7 +189,7 @@ export async function getChainConfig(chainName) {
  */
 export async function getProfileConfig(chainId) {
   const config = await loadConfig();
-  
+
   // Convert chain name to ID if necessary
   let id = chainId;
   if (typeof chainId === 'string' && isNaN(parseInt(chainId))) {
@@ -198,7 +198,7 @@ export async function getProfileConfig(chainId) {
       id = chainConfig.chainId;
     }
   }
-  
+
   return config.profiles?.[id.toString()] || null;
 }
 
@@ -209,17 +209,17 @@ export async function getProfileConfig(chainId) {
  */
 export async function saveProfileConfig(chainId, profile) {
   const config = await loadConfig();
-  
+
   if (!config.profiles) {
     config.profiles = {};
   }
-  
+
   config.profiles[chainId.toString()] = {
     ...config.profiles[chainId.toString()],
     ...profile,
     updatedAt: new Date().toISOString(),
   };
-  
+
   await saveConfig(config);
 }
 
@@ -230,11 +230,11 @@ export async function saveProfileConfig(chainId, profile) {
  */
 export function validateConfig(config) {
   const errors = [];
-  
+
   if (config.defaultChain && !CHAINS[config.defaultChain] && !config.chains?.[config.defaultChain]) {
     errors.push(`Unknown default chain: ${config.defaultChain}`);
   }
-  
+
   if (config.chains) {
     for (const [name, chain] of Object.entries(config.chains)) {
       if (!chain.chainId) {
@@ -245,7 +245,7 @@ export function validateConfig(config) {
       }
     }
   }
-  
+
   if (config.profiles) {
     for (const [chainId, profile] of Object.entries(config.profiles)) {
       if (profile.upAddress && !isValidAddress(profile.upAddress)) {
@@ -259,7 +259,7 @@ export function validateConfig(config) {
       }
     }
   }
-  
+
   return {
     valid: errors.length === 0,
     errors,
@@ -282,13 +282,13 @@ function isValidAddress(address) {
  */
 export function formatConfig(config) {
   const lines = [];
-  
+
   lines.push('┌─────────────────────────────────────┐');
   lines.push('│ Universal Profile Configuration     │');
   lines.push('├─────────────────────────────────────┤');
   lines.push(`│ Default Chain: ${config.defaultChain.padEnd(20)} │`);
   lines.push(`│ Keystore: ${(config.keystorePath ? '✓ Set' : '✗ Not set').padEnd(25)} │`);
-  
+
   if (Object.keys(config.profiles || {}).length > 0) {
     lines.push('├─────────────────────────────────────┤');
     lines.push('│ Configured Profiles:                │');
@@ -298,9 +298,9 @@ export function formatConfig(config) {
       lines.push(`│   ${chainName}: ${upShort.padEnd(23)} │`);
     }
   }
-  
+
   lines.push('└─────────────────────────────────────┘');
-  
+
   return lines.join('\n');
 }
 
