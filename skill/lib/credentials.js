@@ -1,148 +1,119 @@
 /**
  * Universal Profile Credentials Helper
- * Handles credential loading from multiple possible locations
+ *
+ * Credential storage (secret — private key lives here):
+ *   ~/.openclaw/credentials/universal-profile-key.json
+ *
+ * Skill config (non-secret — UP address, chain prefs):
+ *   ~/.openclaw/skills/universal-profile/config.json  (managed by config.js)
+ *
+ * Lookup order:
+ *   1. UP_CREDENTIALS_PATH env var (full path override)
+ *   2. ~/.openclaw/credentials/universal-profile-key.json (standard)
+ *
+ * Expected file format:
+ *   {
+ *     "universalProfile": { "address": "0x..." },
+ *     "controller": {
+ *       "address": "0x...",
+ *       "privateKey": "0x..."
+ *     }
+ *   }
+ *
+ * File permissions: chmod 600  (enforced on write, warned on read)
  */
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const HOME = process.env.HOME || process.env.USERPROFILE || '';
 
 /**
- * Possible credential locations (in priority order)
+ * Canonical path for the credential file
  */
-const CREDENTIAL_PATHS = [
-  // 1. Environment variable (highest priority)
-  process.env.UP_CREDENTIALS_PATH,
-  
-  // 2. OpenClaw standard location
-  path.join(process.env.HOME, '.openclaw', 'universal-profile', 'config.json'),
-  
-  // 3. Legacy clawdbot location
-  path.join(process.env.HOME, '.clawdbot', 'universal-profile', 'config.json'),
-];
-
-const KEY_PATHS = [
-  // Environment variable
-  process.env.UP_KEY_PATH,
-  
-  // OpenClaw standard
-  path.join(process.env.HOME, '.openclaw', 'credentials', 'universal-profile-key.json'),
-  
-  // Legacy clawdbot
-  path.join(process.env.HOME, '.clawdbot', 'credentials', 'universal-profile-key.json'),
-];
-
-/**
- * Find and load credentials
- * @returns {Object} Credentials object with universalProfile and controller
- * @throws {Error} If no credentials found
- */
-export function loadCredentials() {
-  // Try config.json locations
-  for (const credPath of CREDENTIAL_PATHS.filter(Boolean)) {
-    if (fs.existsSync(credPath)) {
-      try {
-        const config = JSON.parse(fs.readFileSync(credPath, 'utf8'));
-        
-        // If controller.privateKey is in config, we're done
-        if (config.controller?.privateKey) {
-          return config;
-        }
-        
-        // Otherwise, try to load key from separate file
-        for (const keyPath of KEY_PATHS.filter(Boolean)) {
-          if (fs.existsSync(keyPath)) {
-            const keyData = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
-            return {
-              ...config,
-              controller: {
-                ...config.controller,
-                ...keyData.controller,
-              }
-            };
-          }
-        }
-        
-        // Config found but no key
-        throw new Error(`Found config at ${credPath} but no private key found`);
-      } catch (error) {
-        if (error.code === 'ENOENT') continue;
-        throw error;
-      }
-    }
-  }
-  
-  // Try key-only files (some setups might only have the key file)
-  for (const keyPath of KEY_PATHS.filter(Boolean)) {
-    if (fs.existsSync(keyPath)) {
-      try {
-        return JSON.parse(fs.readFileSync(keyPath, 'utf8'));
-      } catch (error) {
-        if (error.code === 'ENOENT') continue;
-        throw error;
-      }
-    }
-  }
-  
-  // No credentials found anywhere
-  throw new Error(
-    'Universal Profile credentials not found!\n\n' +
-    'Searched locations:\n' +
-    CREDENTIAL_PATHS.filter(Boolean).map(p => `  - ${p}`).join('\n') +
-    '\n\nTo fix:\n' +
-    '  1. Set UP_CREDENTIALS_PATH environment variable, or\n' +
-    '  2. Place credentials in ~/.openclaw/universal-profile/config.json, or\n' +
-    '  3. Place credentials in ~/.openclaw/credentials/universal-profile-key.json\n\n' +
-    'See SKILL.md for setup instructions.'
+export function getCredentialPath() {
+  return (
+    process.env.UP_CREDENTIALS_PATH ||
+    (HOME && path.join(HOME, '.openclaw', 'credentials', 'universal-profile-key.json'))
   );
 }
 
 /**
- * Get credential file path (for reference)
- * @returns {string|null} Path to credentials file, or null if not found
+ * Find and load credentials
+ * @returns {Object} Credentials object { universalProfile, controller }
+ * @throws {Error} If no credentials found
  */
-export function getCredentialsPath() {
-  for (const credPath of CREDENTIAL_PATHS.filter(Boolean)) {
-    if (fs.existsSync(credPath)) return credPath;
+export function loadCredentials() {
+  const credPath = getCredentialPath();
+
+  if (!credPath) {
+    throw new Error(
+      'Cannot determine credentials path: HOME is not set.\n' +
+      'Set UP_CREDENTIALS_PATH to the full path of your credentials file.'
+    );
   }
-  for (const keyPath of KEY_PATHS.filter(Boolean)) {
-    if (fs.existsSync(keyPath)) return keyPath;
+
+  if (!fs.existsSync(credPath)) {
+    throw new Error(
+      `Universal Profile credentials not found at:\n  ${credPath}\n\n` +
+      'To fix:\n' +
+      '  1. Set UP_CREDENTIALS_PATH to your credentials file path, or\n' +
+      `  2. Create ${credPath} with your UP address and controller private key.\n\n` +
+      'See SKILL.md for the expected file format and setup instructions.'
+    );
   }
-  return null;
+
+  // Warn if permissions are too open (POSIX only)
+  try {
+    const stat = fs.statSync(credPath);
+    const mode = stat.mode & 0o777;
+    if (mode & 0o044) {
+      console.warn(
+        `⚠️  Warning: ${credPath} is readable by group/others (mode ${mode.toString(8)}).\n` +
+        '   Run: chmod 600 ' + credPath
+      );
+    }
+  } catch {
+    // Non-POSIX (Windows) — skip permission check
+  }
+
+  let creds;
+  try {
+    creds = JSON.parse(fs.readFileSync(credPath, 'utf8'));
+  } catch (err) {
+    throw new Error(`Failed to parse credentials file at ${credPath}: ${err.message}`);
+  }
+
+  return creds;
 }
 
 /**
  * Validate credentials structure
- * @param {Object} creds - Credentials object
+ * @param {Object} creds
  * @throws {Error} If credentials are invalid
  */
 export function validateCredentials(creds) {
   if (!creds.universalProfile?.address) {
-    throw new Error('Missing universalProfile.address in credentials');
+    throw new Error('Missing universalProfile.address in credentials file');
   }
   if (!creds.controller?.address) {
-    throw new Error('Missing controller.address in credentials');
+    throw new Error('Missing controller.address in credentials file');
   }
   if (!creds.controller?.privateKey) {
-    throw new Error('Missing controller.privateKey in credentials');
+    throw new Error('Missing controller.privateKey in credentials file');
   }
-  
-  // Validate address format
+
   const addressRegex = /^0x[a-fA-F0-9]{40}$/;
   if (!addressRegex.test(creds.universalProfile.address)) {
-    throw new Error('Invalid universalProfile.address format');
+    throw new Error('Invalid universalProfile.address format (expected 0x + 40 hex chars)');
   }
   if (!addressRegex.test(creds.controller.address)) {
-    throw new Error('Invalid controller.address format');
+    throw new Error('Invalid controller.address format (expected 0x + 40 hex chars)');
   }
-  
-  // Validate private key format (with or without 0x prefix)
+
   const keyRegex = /^(0x)?[a-fA-F0-9]{64}$/;
   if (!keyRegex.test(creds.controller.privateKey)) {
-    throw new Error('Invalid controller.privateKey format');
+    throw new Error('Invalid controller.privateKey format (expected 0x + 64 hex chars)');
   }
 }
 
@@ -154,4 +125,23 @@ export function loadAndValidateCredentials() {
   const creds = loadCredentials();
   validateCredentials(creds);
   return creds;
+}
+
+/**
+ * Save credentials to the standard path
+ * Sets file permissions to 600 on POSIX systems.
+ * @param {Object} creds
+ */
+export function saveCredentials(creds) {
+  validateCredentials(creds);
+
+  const credPath = getCredentialPath();
+  if (!credPath) {
+    throw new Error('Cannot determine credentials path: HOME is not set.');
+  }
+
+  const dir = path.dirname(credPath);
+  fs.mkdirSync(dir, { recursive: true });
+
+  fs.writeFileSync(credPath, JSON.stringify(creds, null, 2), { encoding: 'utf8', mode: 0o600 });
 }
