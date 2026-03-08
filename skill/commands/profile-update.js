@@ -17,6 +17,8 @@
 import { ethers } from 'ethers';
 import https from 'https';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import FormData from 'form-data';
 import { executeRelay } from '../lib/execute/relay.js';
 import { executeDirect } from '../lib/execute/direct.js';
@@ -25,9 +27,33 @@ import { OPERATION_TYPES } from '../lib/constants.js';
 // Configuration
 const LSP3_PROFILE_KEY = '0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5';
 
-// Pinata API credentials (set via environment variables)
-const PINATA_API_KEY = process.env.PINATA_API_KEY;
-const PINATA_SECRET = process.env.PINATA_SECRET;
+// Pinata API credentials (loaded from credentials file)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function loadPinataCredentials() {
+  const credentialsPath = path.resolve(__dirname, '../../../../credentials/pinata.json');
+  try {
+    const data = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+    return {
+      apiKey: data.api_key,
+      secret: data.secret
+    };
+  } catch (err) {
+    throw new Error(
+      'Failed to load Pinata credentials.\n' +
+      `Expected file: ${credentialsPath}\n` +
+      'Create it with:\n' +
+      '{\n' +
+      '  "api_key": "your-api-key",\n' +
+      '  "secret": "your-secret"\n' +
+      '}\n' +
+      'Get keys at: https://app.pinata.cloud/developers'
+    );
+  }
+}
+
+const { apiKey: PINATA_API_KEY, secret: PINATA_SECRET } = loadPinataCredentials();
 
 // UP ABI for setData
 const UP_ABI = ['function setData(bytes32 dataKey, bytes dataValue) external'];

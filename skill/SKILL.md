@@ -243,9 +243,19 @@ Both commands:
 - Execute setData() on-chain
 - Verify hash matches
 
-**Environment variables required:**
-- `PINATA_API_KEY` - Your Pinata API key
-- `PINATA_SECRET` - Your Pinata secret
+**Pinata Credentials Setup:**
+
+Create `~/.openclaw/credentials/pinata.json`:
+```json
+{
+  "api_key": "your-api-key",
+  "secret": "your-secret"
+}
+```
+
+Get keys at: https://app.pinata.cloud/developers
+
+File permissions: `chmod 600` (automatically set)
 
 ### Manual LSP3 Profile Update Procedure
 
