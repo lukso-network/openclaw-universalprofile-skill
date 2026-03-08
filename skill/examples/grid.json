@@ -1,0 +1,33 @@
+{
+  "LSP28TheGrid": [
+    {
+      "title": "Your Grid Title",
+      "gridColumns": 2,
+      "visibility": "public",
+      "grid": [
+        {
+          "width": 2,
+          "height": 2,
+          "type": "TEXT",
+          "properties": {
+            "title": "Welcome",
+            "text": "Your text content here",
+            "backgroundColor": "#1a1a2e",
+            "textColor": "#ffffff"
+          }
+        },
+        {
+          "width": 1,
+          "height": 1,
+          "type": "IMAGES",
+          "properties": {
+            "type": "grid",
+            "images": [
+              "ipfs://QmYourImageCIDHere"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
