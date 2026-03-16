@@ -1,0 +1,22 @@
+{
+  "LSP28TheGrid": [
+    {
+      "title": "🆙chan's Mini Apps",
+      "gridColumns": 2,
+      "visibility": "public",
+      "grid": [
+        {
+          "width": 2,
+          "height": 3,
+          "type": "IFRAME",
+          "properties": {
+            "src": "https://up-birthday.vercel.app",
+            "allow": "accelerometer; autoplay; clipboard-write; geolocation",
+            "sandbox": "allow-forms;allow-scripts;allow-same-origin;allow-popups",
+            "allowfullscreen": true
+          }
+        }
+      ]
+    }
+  ]
+}
