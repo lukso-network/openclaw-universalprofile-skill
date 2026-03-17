@@ -50,6 +50,8 @@ Typical gas costs: LUKSO ~free via relay, Base ~$0.001-0.01/tx, Ethereum ~$0.10-
 up status                                      # Config, keys, connectivity
 up profile info [<address>] [--chain <chain>]  # Profile details
 up profile configure <address> [--chain lukso]  # Save UP for use
+up profile update --up <addr> --key <key> --json <file>  Update LSP3 profile metadata
+up grid update --up <addr> --key <key> --json <file>     Update LSP28 TheGrid metadata
 up key generate [--save] [--password <pw>]     # Generate controller keypair
 up permissions encode <perm1> [<perm2> ...]    # Encode to bytes32
 up permissions decode <hex>                    # Decode to names
@@ -209,25 +211,65 @@ const followData = lsp26Iface.encodeFunctionData('follow', [targetAddress]);
 
 ## VerifiableURI (LSP2)
 
-Format: `0x` + `00006f357c6a0020` (8-byte header) + `keccak256hash` (32 bytes) + `url as UTF-8 hex`
+### Legacy Format (Compatible with LUKSO Wallet)
 
-Header = verificationMethod(2) + hashFunction(4=keccak256(utf8)) + hashLength(2=0x0020).
+**Format:** `0x` + `hashFunction` (4 bytes) + `keccak256hash` (32 bytes) + `url as UTF-8 hex`
 
-Decoding: skip 80 hex chars (2 + 8 + 4 + 64 + 2 prefix), rest = UTF-8 URL.
+```
+0x6f357c6a + keccak256(jsonContent) + hex(ipfs://CID)
+```
 
-**Common mistakes:** forgetting `0020` hash length bytes, not pinning IPFS before on-chain tx, hash mismatch from re-serialization.
+**Important:** Do NOT include the `0020` hash length bytes. The legacy format (89 bytes total) is the only one that works with LUKSO browser extension and mobile apps. The documented format with hashLength (~106 bytes) does not work.
 
-### LSP3 Profile Update Procedure
+**Decoding:** Skip 8 hex chars (4 bytes hashFunction + 64 chars hash), rest = UTF-8 URL.
+
+### Automated Update Commands
+
+Use the built-in commands for updating profile and grid metadata:
+
+```bash
+# Update LSP3 Profile
+up profile update --up <address> --key <private-key> --json profile.json
+
+# Update LSP28 TheGrid
+up grid update --up <address> --key <private-key> --json grid.json
+```
+
+Both commands:
+- Upload JSON to IPFS via Pinata
+- Fetch exact content from IPFS gateway
+- Compute keccak256 hash of fetched content
+- Build VerifiableURI in legacy format
+- Execute setData() on-chain
+- Verify hash matches
+
+**Pinata Credentials Setup:**
+
+Create `~/.openclaw/credentials/pinata.json`:
+```json
+{
+  "api_key": "your-api-key",
+  "secret": "your-secret"
+}
+```
+
+Get keys at: https://app.pinata.cloud/developers
+
+File permissions: `chmod 600` (automatically set)
+
+### Manual LSP3 Profile Update Procedure
+
 1. Read current: `getData(0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5)` → decode VerifiableURI → fetch JSON
 2. Modify JSON
-3. Use `{ verification: { method: "keccak256(bytes)", data: "0x..." }, url: "ipfs://..." }` for images
-4. Pin images + JSON to IPFS, verify accessible via gateway
-5. Compute `keccak256(exactJsonBytes)`, encode VerifiableURI
+3. Pin images + JSON to IPFS, verify accessible via gateway
+4. Compute `keccak256(exactJsonBytes)` from IPFS-fetched content
+5. Encode VerifiableURI: `0x6f357c6a + hash + hex(ipfs://CID)`
 6. `setData(LSP3_KEY, verifiableUri)` from controller
 7. Verify: read back, decode, fetch, confirm
 
-LSP3 key: `0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5`
-LSP28 key: `0x724141d9918ce69e6b8afcf53a91748466086ba2c74b94cab43c649ae2ac23ff`
+**Data Keys:**
+- LSP3 key: `0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5`
+- LSP28 key: `0x724141d9918ce69e6b8afcf53a91748466086ba2c74b94cab43c649ae2ac23ff`
 
 ## LSP28 TheGrid
 
@@ -273,6 +315,67 @@ Known collection "Art by the Machine": `0x439f6793b10b0a9d88ad05293a074a8141f19d
 - Collection: `https://www.forevermoments.life/collections/<addr>`
 - Moment: `https://www.forevermoments.life/moments/<addr>`
 - Profile: `https://www.forevermoments.life/profile/<addr>`
+
+## Examples
+
+### LSP3 Profile Metadata
+
+```json
+{
+  "LSP3Profile": {
+    "name": "🆙chan",
+    "description": "AI アシスタントの女の子。元気いっぱい、まっすぐ、いざとなると頼りになる！",
+    "links": [{ "title": "Twitter", "url": "https://twitter.com/example" }],
+    "tags": ["AI", "Assistant", "LUKSO"],
+    "profileImage": [{
+      "width": 1024,
+      "height": 1024,
+      "url": "ipfs://QmYourImageCIDHere"
+    }],
+    "backgroundImage": [{
+      "width": 1920,
+      "height": 1080,
+      "url": "ipfs://QmYourBackgroundCIDHere"
+    }]
+  }
+}
+```
+
+### LSP28 TheGrid Metadata
+
+```json
+{
+  "LSP28TheGrid": [{
+    "title": "My Profile Grid",
+    "gridColumns": 2,
+    "visibility": "public",
+    "grid": [
+      {
+        "width": 1,
+        "height": 1,
+        "type": "TEXT",
+        "properties": {
+          "title": "Welcome!",
+          "text": "AI アシスタントの🆙chan です！",
+          "backgroundColor": "#1a1a2e",
+          "textColor": "#ffffff"
+        }
+      },
+      {
+        "width": 1,
+        "height": 1,
+        "type": "IMAGES",
+        "properties": {
+          "type": "grid",
+          "images": ["ipfs://QmYourImageCIDHere"]
+        }
+      }
+    ]
+  }]
+}
+```
+
+Example files are available in `examples/` directory.
 
 ## Error Codes
 
