@@ -202,8 +202,8 @@ export const CHAINS = {
     network: 'ethereum',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     rpcUrls: {
-      default: { http: ['https://eth.llamarpc.com'] },
-      public: { http: ['https://eth.llamarpc.com'] },
+      default: { http: ['https://ethereum-rpc.publicnode.com'] },
+      public: { http: ['https://ethereum-rpc.publicnode.com'] },
     },
     blockExplorers: {
       default: { name: 'Etherscan', url: 'https://etherscan.io' },
