@@ -189,12 +189,6 @@ export function useWallet() {
       setModalChain(targetChainId)
     }
 
-    // Re-show the modal element in case it was force-hidden after a previous connect
-    const modal = document.querySelector('connect-modal') as HTMLElement | null
-    if (modal) {
-      modal.style.display = ''
-    }
-
     luksoConnector.showSignInModal()
   }, [luksoConnector, setModalChain])
 

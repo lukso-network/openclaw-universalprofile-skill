@@ -8,21 +8,11 @@ import { createMultiChainWagmiConfig } from '../lib/walletConfig'
 
 const queryClient = new QueryClient()
 
-/** Force-close the up-modal connect dialog via DOM */
+/** Force-close the up-modal connect dialog via its `open` property */
 function forceCloseModal() {
-  const modal = document.querySelector('connect-modal') as HTMLElement | null
+  const modal = document.querySelector('connect-modal') as any
   if (modal) {
-    // Try the standard close method first
-    if ('close' in modal && typeof (modal as any).close === 'function') {
-      (modal as any).close()
-    }
-    // Also remove the open attribute and hide it
-    modal.removeAttribute('open')
-    // Remove the backdrop/overlay
-    const backdrop = modal.shadowRoot?.querySelector('.modal-backdrop, .overlay, [part="backdrop"]') as HTMLElement | null
-    if (backdrop) backdrop.style.display = 'none'
-    // Hide the whole element
-    modal.style.display = 'none'
+    modal.open = false
   }
 }
 
@@ -82,7 +72,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       // This is a fallback for when up-modal's own onConnect doesn't fire (non-LUKSO chains)
       watchAccount(customWagmiConfig as any, {
         onChange(account) {
+          console.log('[WalletProvider] watchAccount:', account.status, account.address, account.chainId)
           if (account.isConnected) {
+            console.log('[WalletProvider] Connection detected, closing modal')
             forceCloseModal()
           }
         },
