@@ -65,6 +65,14 @@ export function useWallet() {
     }
   }, [wagmiConnected, wagmiDisconnect])
 
+  // === AUTO-CLOSE MODAL on successful connection ===
+  // up-modal may not auto-close when connecting on non-LUKSO chains
+  useEffect(() => {
+    if (wagmiConnected && !manuallyDisconnected.current && luksoConnector) {
+      luksoConnector.closeModal()
+    }
+  }, [wagmiConnected, luksoConnector])
+
   // === COMPUTED STATE ===
   const isConnected = wagmiConnected && !manuallyDisconnected.current
   const isConnecting = wagmiConnecting
