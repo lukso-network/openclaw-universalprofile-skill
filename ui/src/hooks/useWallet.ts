@@ -7,7 +7,7 @@ import {
   type Hex,
   type Chain
 } from 'viem'
-import { useAccount, useConnect, useDisconnect, useWalletClient as useWagmiWalletClient, useSwitchChain } from 'wagmi'
+import { useAccount, useDisconnect, useWalletClient as useWagmiWalletClient, useSwitchChain } from 'wagmi'
 import { CHAINS, LSP0_ABI, DATA_KEYS, getChainById } from '../constants'
 import { fetchLuksoProfileData } from './useLuksoProfile'
 import { useLuksoConnector, useSetModalChain } from '../providers/WalletProvider'
@@ -43,7 +43,6 @@ export function useWallet() {
   // === WAGMI HOOKS (driven by up-modal's wagmi config) ===
   const { address: wagmiAddress, isConnected: wagmiConnected, isConnecting: wagmiConnecting, chainId: wagmiChainId, connector: wagmiConnector } = useAccount()
   const { data: wagmiWalletClient } = useWagmiWalletClient()
-  const { connectAsync, connectors } = useConnect()
   const { disconnect: wagmiDisconnect } = useDisconnect()
   const { switchChain: wagmiSwitchChain } = useSwitchChain()
 
@@ -176,40 +175,22 @@ export function useWallet() {
     }
   }, [address, publicClient, fetchProfileData])
 
-  // === CONNECT ===
-  // For LUKSO chains: use up-modal (handles UP Extension detection, WalletConnect, etc.)
-  // For non-LUKSO chains: connect directly via wagmi's injected connector
+  // === CONNECT (opens up-modal) ===
   const connect = useCallback(async (targetChainId?: number) => {
+    if (!luksoConnector) {
+      setError('Wallet modal not initialized yet. Please try again.')
+      return
+    }
     setError(null)
     manuallyDisconnected.current = false
 
-    const isLuksoChain = !targetChainId || targetChainId === 42 || targetChainId === 4201
-
-    if (isLuksoChain) {
-      // LUKSO chains → use up-modal
-      if (!luksoConnector) {
-        setError('Wallet modal not initialized yet. Please try again.')
-        return
-      }
-      if (targetChainId) {
-        setModalChain(targetChainId)
-      }
-      luksoConnector.showSignInModal()
-    } else {
-      // Non-LUKSO chains → connect directly via wagmi injected connector
-      const injectedConnector = connectors.find(c => c.id === 'injected' || c.type === 'injected')
-      if (!injectedConnector) {
-        setError('No wallet extension detected. Please install the UP Browser Extension or MetaMask.')
-        return
-      }
-      try {
-        await connectAsync({ connector: injectedConnector, chainId: targetChainId })
-      } catch (err) {
-        console.error('[useWallet] Direct connect failed:', err)
-        setError(err instanceof Error ? err.message : 'Failed to connect wallet')
-      }
+    // Set the target chain so up-modal connects on the right network
+    if (targetChainId) {
+      setModalChain(targetChainId)
     }
-  }, [luksoConnector, setModalChain, connectors, connectAsync])
+
+    luksoConnector.showSignInModal()
+  }, [luksoConnector, setModalChain])
 
   // === DISCONNECT ===
   const disconnect = useCallback(() => {
