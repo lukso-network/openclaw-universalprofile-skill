@@ -257,6 +257,8 @@ function App() {
             onRetryConnect={wallet.connectExtension}
             getProvider={wallet.getProvider}
             isPendingImport={wallet.pendingProfileImport || (!wallet.isConnected && !wallet.pendingProfileImport)}
+            isConnected={wallet.isConnected}
+            onConnect={wallet.connect}
           />
         </div>
       )}
