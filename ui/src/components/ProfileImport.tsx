@@ -122,6 +122,20 @@ export function ProfileImport({
     }
 
     try {
+      // Check the extension's current chain and switch if needed
+      const currentChainHex = await provider.request({ method: 'eth_chainId' }) as string
+      const currentChain = parseInt(currentChainHex, 16)
+      console.log('[ProfileImport] Extension on chain:', currentChain, 'target:', currentChainId)
+
+      if (currentChain !== currentChainId) {
+        console.log('[ProfileImport] Switching extension to chain:', currentChainId)
+        await provider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: `0x${currentChainId.toString(16)}` }],
+        })
+        console.log('[ProfileImport] Chain switch succeeded')
+      }
+
       console.log('[ProfileImport] Calling up_import with:', knownUpAddress)
       await provider.request({
         method: 'up_import',
