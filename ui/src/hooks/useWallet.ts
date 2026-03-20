@@ -67,11 +67,16 @@ export function useWallet() {
 
   // Note: modal auto-close is handled by WalletProvider's watchAccount + markModalOpening
 
+  // === DIRECT CONNECTION STATE (non-LUKSO chains via window.lukso) ===
+  const [directAddress, setDirectAddress] = useState<Address | null>(null)
+  const [directChainId, setDirectChainId] = useState<number | null>(null)
+
   // === COMPUTED STATE ===
-  const isConnected = wagmiConnected && !manuallyDisconnected.current
+  const wagmiIsConnected = wagmiConnected && !manuallyDisconnected.current
+  const isConnected = wagmiIsConnected || directAddress !== null
   const isConnecting = wagmiConnecting
-  const address = isConnected ? (wagmiAddress ?? null) : null
-  const chainId = isConnected ? (wagmiChainId ?? null) : null
+  const address = wagmiIsConnected ? (wagmiAddress ?? null) : directAddress
+  const chainId = wagmiIsConnected ? (wagmiChainId ?? null) : directChainId
 
   // Connection method derived from wagmi connector
   const connectionMethod = useMemo<ConnectionMethod>(() => {
@@ -169,7 +174,7 @@ export function useWallet() {
     }
   }, [address, publicClient, fetchProfileData])
 
-  // === CONNECT (opens up-modal) ===
+  // === CONNECT ===
   const connect = useCallback(async (targetChainId?: number) => {
     if (!luksoConnector) {
       setError('Wallet modal not initialized yet. Please try again.')
@@ -178,13 +183,54 @@ export function useWallet() {
     setError(null)
     manuallyDisconnected.current = false
 
-    // Set the target chain so up-modal connects on the right network
-    if (targetChainId) {
-      setModalChain(targetChainId)
-    }
+    const isLuksoChain = !targetChainId || targetChainId === 42 || targetChainId === 4201
 
-    markModalOpening()
-    luksoConnector.showSignInModal()
+    if (isLuksoChain) {
+      // LUKSO chains — up-modal handles everything
+      if (targetChainId) {
+        setModalChain(targetChainId)
+      }
+      markModalOpening()
+      luksoConnector.showSignInModal()
+    } else {
+      // Non-LUKSO chains — connect directly via window.lukso
+      // The up-modal's internal connect flow doesn't work on Ethereum/Base
+      if (typeof window !== 'undefined' && (window as any).lukso) {
+        const lukso = (window as any).lukso
+        try {
+          // Switch extension to the target chain
+          console.log('[useWallet] Switching extension to chain:', targetChainId)
+          await lukso.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: `0x${targetChainId.toString(16)}` }],
+          })
+
+          // Request accounts
+          console.log('[useWallet] Requesting accounts on chain:', targetChainId)
+          const accounts = await lukso.request({ method: 'eth_requestAccounts' }) as string[]
+          console.log('[useWallet] Got accounts:', accounts)
+
+          if (accounts.length > 0) {
+            // Set direct connection state (wagmi won't track this)
+            setDirectAddress(accounts[0] as Address)
+            setDirectChainId(targetChainId)
+            setKnownUpAddressInternal(accounts[0] as Address)
+            setOriginalChainId(targetChainId)
+            console.log('[useWallet] Direct connection established:', accounts[0], 'on chain', targetChainId)
+          }
+        } catch (err: any) {
+          console.error('[useWallet] Direct connect failed:', err)
+          setError(err?.message || 'Failed to connect. Make sure the UP Browser Extension is installed.')
+        }
+      } else {
+        // No extension — show modal for WalletConnect/mobile fallback
+        if (targetChainId) {
+          setModalChain(targetChainId)
+        }
+        markModalOpening()
+        luksoConnector.showSignInModal()
+      }
+    }
   }, [luksoConnector, setModalChain])
 
   // === DISCONNECT ===
@@ -193,6 +239,10 @@ export function useWallet() {
 
     wagmiDisconnect()
     luksoConnector?.closeModal()
+
+    // Clear direct connection state
+    setDirectAddress(null)
+    setDirectChainId(null)
 
     // Clear known UP address
     setKnownUpAddressInternal(null)
@@ -234,17 +284,21 @@ export function useWallet() {
 
   // Get the raw provider from the wagmi connector (for up_import calls)
   const getProvider = useCallback(() => {
-    if (!wagmiConnector) return null
-    // Return a provider-like object that can call up_import
-    return {
-      request: async (args: { method: string; params?: unknown[] }) => {
-        const provider = await wagmiConnector.getProvider()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return (provider as any).request(args)
-      },
-      on: () => {},
-      removeListener: () => {},
+    // Try wagmi connector first, then window.lukso
+    if (wagmiConnector) {
+      return {
+        request: async (args: { method: string; params?: unknown[] }) => {
+          const provider = await wagmiConnector.getProvider()
+          return (provider as any).request(args)
+        },
+        on: () => {},
+        removeListener: () => {},
+      }
     }
+    if (typeof window !== 'undefined' && (window as any).lukso) {
+      return (window as any).lukso
+    }
+    return null
   }, [wagmiConnector])
 
   return {
