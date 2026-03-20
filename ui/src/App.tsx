@@ -285,7 +285,7 @@ function App() {
       {/* Network Selector — always interactive, even before connecting */}
       <div className="max-w-2xl mx-auto px-4 pt-6">
         <NetworkSelector
-          currentChainId={effectiveChainId}
+          currentChainId={selectedChainId ?? effectiveChainId}
           onSwitch={handleNetworkSwitch}
           isConnected={wallet.isConnected}
         />
