@@ -174,7 +174,7 @@ export function useWallet() {
     }
   }, [address, publicClient, fetchProfileData])
 
-  // === CONNECT ===
+  // === CONNECT (always uses up-modal) ===
   const connect = useCallback(async (targetChainId?: number) => {
     if (!luksoConnector) {
       setError('Wallet modal not initialized yet. Please try again.')
@@ -183,54 +183,14 @@ export function useWallet() {
     setError(null)
     manuallyDisconnected.current = false
 
-    const isLuksoChain = !targetChainId || targetChainId === 42 || targetChainId === 4201
-
-    if (isLuksoChain) {
-      // LUKSO chains — up-modal handles everything
-      if (targetChainId) {
-        setModalChain(targetChainId)
-      }
-      markModalOpening()
-      luksoConnector.showSignInModal()
-    } else {
-      // Non-LUKSO chains — connect directly via window.lukso
-      // The up-modal's internal connect flow doesn't work on Ethereum/Base
-      if (typeof window !== 'undefined' && (window as any).lukso) {
-        const lukso = (window as any).lukso
-        try {
-          // Switch extension to the target chain
-          console.log('[useWallet] Switching extension to chain:', targetChainId)
-          await lukso.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: `0x${targetChainId.toString(16)}` }],
-          })
-
-          // Request accounts
-          console.log('[useWallet] Requesting accounts on chain:', targetChainId)
-          const accounts = await lukso.request({ method: 'eth_requestAccounts' }) as string[]
-          console.log('[useWallet] Got accounts:', accounts)
-
-          if (accounts.length > 0) {
-            // Set direct connection state (wagmi won't track this)
-            setDirectAddress(accounts[0] as Address)
-            setDirectChainId(targetChainId)
-            setKnownUpAddressInternal(accounts[0] as Address)
-            setOriginalChainId(targetChainId)
-            console.log('[useWallet] Direct connection established:', accounts[0], 'on chain', targetChainId)
-          }
-        } catch (err: any) {
-          console.error('[useWallet] Direct connect failed:', err)
-          setError(err?.message || 'Failed to connect. Make sure the UP Browser Extension is installed.')
-        }
-      } else {
-        // No extension — show modal for WalletConnect/mobile fallback
-        if (targetChainId) {
-          setModalChain(targetChainId)
-        }
-        markModalOpening()
-        luksoConnector.showSignInModal()
-      }
+    // Set the target chain so up-modal connects on the right network
+    if (targetChainId) {
+      console.log('[useWallet] Setting modal chain to:', targetChainId)
+      setModalChain(targetChainId)
     }
+
+    markModalOpening()
+    luksoConnector.showSignInModal()
   }, [luksoConnector, setModalChain])
 
   // === DISCONNECT ===

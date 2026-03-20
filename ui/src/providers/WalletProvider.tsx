@@ -70,7 +70,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       connectors: {
         eoa: false,
       },
-      onConnect: () => {
+      onConnect: (...args: any[]) => {
+        console.log('[WalletProvider] onConnect fired!', args)
         isModalOpeningRef.current = false
         forceCloseModal()
       },
@@ -78,6 +79,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setConnector(c)
       wagmiConfigRef.current = c.wagmiConfig
       setWagmiConfig(c.wagmiConfig as unknown as Config)
+
+      // Debug: log wagmi config chains
+      const cfg = c.wagmiConfig as any
+      console.log('[WalletProvider] wagmi config chains:', cfg.chains?.map((ch: any) => ({ id: ch.id, name: ch.name })))
+      console.log('[WalletProvider] wagmi connectors:', cfg.connectors?.map((cn: any) => ({ id: cn.id, name: cn.name, type: cn.type })))
 
       // Watch for account changes via wagmi — close the modal when connected
       // Only close if we're actively opening the modal (isModalOpeningRef)
