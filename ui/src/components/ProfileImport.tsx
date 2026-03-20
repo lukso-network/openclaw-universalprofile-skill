@@ -87,7 +87,19 @@ export function ProfileImport({
   }, [localPublicClient, knownUpAddress])
 
   const handleImport = useCallback(async () => {
+    console.log('[ProfileImport] handleImport called, getProvider:', !!getProvider, 'isConnected:', isConnected)
+    
     if (!getProvider) {
+      console.log('[ProfileImport] No getProvider, falling back to onImport')
+      onImport()
+      return
+    }
+
+    const provider = getProvider()
+    console.log('[ProfileImport] provider:', !!provider, 'knownUpAddress:', knownUpAddress)
+    
+    if (!provider) {
+      console.log('[ProfileImport] Provider is null, falling back to onImport')
       onImport()
       return
     }
@@ -96,34 +108,32 @@ export function ProfileImport({
     setImportError(null)
     setShowManualInstructions(false)
 
-    const provider = getProvider()
-    if (provider) {
-      try {
-        // Call the UP extension's up_import RPC method with the profile address
-        await provider.request({
-          method: 'up_import',
-          params: [knownUpAddress],
-        })
-        console.log('[ProfileImport] up_import succeeded')
+    try {
+      // Call the UP extension's up_import RPC method with the profile address
+      console.log('[ProfileImport] Calling up_import with:', knownUpAddress)
+      await provider.request({
+        method: 'up_import',
+        params: [knownUpAddress],
+      })
+      console.log('[ProfileImport] up_import succeeded')
 
-        // Import succeeded — retry the full connection so wagmi picks up the new address
-        if (onRetryConnect) {
-          await onRetryConnect()
-        }
-        setImporting(false)
-        return
-      } catch (err) {
-        console.warn('[ProfileImport] up_import failed:', err)
-        // Method not supported or user rejected — show manual instructions
+      // Import succeeded — show manual instructions to confirm in extension
+      // then user can retry connection
+      setShowManualInstructions(true)
+      setImporting(false)
+    } catch (err: any) {
+      console.warn('[ProfileImport] up_import failed:', err)
+      const message = err?.message || String(err)
+      
+      // If method not found/supported, show manual import instructions
+      if (message.includes('not supported') || message.includes('not found') || message.includes('Method')) {
         setShowManualInstructions(true)
-        setImporting(false)
-        return
+      } else {
+        setImportError(`Import failed: ${message}`)
       }
+      setImporting(false)
     }
-
-    setImporting(false)
-    onImport()
-  }, [getProvider, knownUpAddress, onRetryConnect, onImport])
+  }, [getProvider, knownUpAddress, isConnected, onImport])
 
   const handleRetryAfterManualImport = useCallback(async () => {
     if (onRetryConnect) {
@@ -224,7 +234,14 @@ export function ProfileImport({
             {!showManualInstructions && (
               <div className="mt-3">
                 <button
-                  onClick={isConnected ? handleImport : onConnect}
+                  onClick={() => {
+                    console.log('[ProfileImport] Button clicked, isConnected:', isConnected)
+                    if (isConnected) {
+                      handleImport()
+                    } else if (onConnect) {
+                      onConnect()
+                    }
+                  }}
                   disabled={importing}
                   className={`inline-flex items-center gap-2 ${isConnected ? 'btn-primary' : 'btn-primary'}`}
                 >
