@@ -350,6 +350,19 @@ function App() {
             onConnect={handleConnect}
             onDisconnect={wallet.disconnect}
           />
+          {!wallet.isConnected && (
+            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+              Need to move your profile from the mobile app to the browser extension?{' '}
+              <a
+                href="https://authorize.universalprofile.cloud"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-lukso-pink hover:underline"
+              >
+                Use authorize.universalprofile.cloud
+              </a>
+            </p>
+          )}
         </section>}
 
         {/* Step 2: Controller Address */}
