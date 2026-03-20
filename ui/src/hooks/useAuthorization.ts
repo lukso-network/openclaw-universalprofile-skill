@@ -4,7 +4,10 @@ import {
   type Hex,
   type WalletClient,
   type PublicClient,
+  createWalletClient,
+  custom,
 } from 'viem'
+import { getChainById } from '../constants'
 import { LSP0_ABI, DATA_KEYS } from '../constants'
 import { buildControllerData, combinePermissions, type AllowedCall, encodeAllowedCalls, encodeAllowedDataKeys } from '../utils'
 
@@ -121,19 +124,39 @@ export function useAuthorization(
 
   // Authorize a new controller
   const authorize = useCallback(async (params: AuthorizationParams) => {
-    if (!walletClient || !publicClient || !upAddress) {
-      const detail = {
-        hasWalletClient: !!walletClient,
-        hasPublicClient: !!publicClient,
-        upAddress: upAddress ?? null,
-      }
-      console.error('[useAuthorization] Cannot authorize: wallet not fully ready', detail)
+    if (!publicClient || !upAddress) {
+      console.error('[useAuthorization] Cannot authorize: missing publicClient or upAddress')
       setState({
         status: 'error',
         txHash: null,
-        error: !walletClient
-          ? 'Wallet client not ready. If you just connected via WalletConnect, please wait a moment and try again.'
-          : 'Wallet not connected',
+        error: 'Wallet not connected',
+      })
+      return
+    }
+
+    // Get wallet client — use wagmi's or create one from window.lukso
+    let activeWalletClient = walletClient
+    if (!activeWalletClient && typeof window !== 'undefined' && (window as any).lukso) {
+      console.log('[useAuthorization] Creating wallet client from window.lukso')
+      const luksoProvider = (window as any).lukso
+      // Get the current chain from the extension
+      const chainIdHex = await luksoProvider.request({ method: 'eth_chainId' }) as string
+      const currentChainId = parseInt(chainIdHex, 16)
+      const chain = getChainById(currentChainId)
+      
+      activeWalletClient = createWalletClient({
+        account: upAddress,
+        chain: chain as any,
+        transport: custom(luksoProvider),
+      })
+    }
+
+    if (!activeWalletClient) {
+      console.error('[useAuthorization] No wallet client available')
+      setState({
+        status: 'error',
+        txHash: null,
+        error: 'No wallet available. Please connect via the UP Browser Extension.',
       })
       return
     }
@@ -185,13 +208,13 @@ export function useAuthorization(
       setState({ status: 'pending', txHash: null, error: null })
 
       // Execute setDataBatch
-      const hash = await walletClient.writeContract({
+      const hash = await activeWalletClient.writeContract({
         address: upAddress,
         abi: LSP0_ABI,
         functionName: 'setDataBatch',
         args: [dataKeys, dataValues],
         account: upAddress,
-        chain: walletClient.chain,
+        chain: activeWalletClient.chain,
       })
 
       console.log('Transaction hash:', hash)

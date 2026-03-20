@@ -86,6 +86,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   // Callback to update the modal's target chain before opening
   const setModalChain = useRef((chainId: number) => {
+    console.log('[WalletProvider] setModalChain called:', chainId, 'wagmiConfig:', !!wagmiConfigRef.current)
     if (wagmiConfigRef.current) {
       wagmiService.configure({
         wagmiConfig: wagmiConfigRef.current,
