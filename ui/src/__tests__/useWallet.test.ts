@@ -26,11 +26,14 @@ vi.mock('wagmi', () => ({
 // --- LuksoConnector mock ---
 const mockShowSignInModal = vi.fn()
 const mockCloseModal = vi.fn()
+const mockSetModalChain = vi.fn()
 vi.mock('../providers/WalletProvider', () => ({
   useLuksoConnector: () => ({
     showSignInModal: mockShowSignInModal,
     closeModal: mockCloseModal,
   }),
+  useSetModalChain: () => mockSetModalChain,
+  markModalOpening: vi.fn(),
 }))
 
 // --- Mock viem clients ---

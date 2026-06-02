@@ -34,7 +34,6 @@ function App() {
   
   // Sync selectedChainId when wallet connects or chain changes
   const walletChainId = wallet.chainId ?? wallet.extensionChainDetected
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (walletChainId) setSelectedChainId(walletChainId) }, [walletChainId])
   
   // The effective chain ID for display purposes

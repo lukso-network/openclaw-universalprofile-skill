@@ -157,7 +157,7 @@ export function ProfileImport({
       }
       setImporting(false)
     }
-  }, [knownUpAddress, getProvider])
+  }, [knownUpAddress, currentChainId, getProvider])
 
   const handleRetryAfterManualImport = useCallback(async () => {
     if (onRetryConnect) {

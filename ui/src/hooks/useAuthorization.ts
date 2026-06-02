@@ -268,7 +268,7 @@ export function useAuthorization(
         error: err instanceof Error ? err.message : 'Authorization failed',
       })
     }
-  }, [walletClient, publicClient, upAddress, checkExistingController, getControllersCount])
+  }, [walletClient, publicClient, upAddress, checkExistingController, getControllersCount, findEmptySlot])
 
   // Reset state
   const reset = useCallback(() => {

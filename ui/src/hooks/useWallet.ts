@@ -207,6 +207,10 @@ export function useWallet() {
     // Clear known UP address
     setKnownUpAddressInternal(null)
     setOriginalChainId(null)
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('openclaw_known_up_address')
+      window.localStorage.removeItem('openclaw_original_chain_id')
+    }
 
     setProfileData(null)
     setError(null)
