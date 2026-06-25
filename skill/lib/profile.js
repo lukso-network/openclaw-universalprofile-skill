@@ -219,18 +219,32 @@ export async function isUniversalProfile(address, provider) {
  */
 export async function getKeyManager(upAddress, provider) {
   try {
-    const contract = new ethers.Contract(upAddress, ABIS.LSP0, provider);
-    const owner = await contract.owner();
+    const up = new ethers.Contract(upAddress, ABIS.LSP0, provider);
     
-    // Check if owner is a Key Manager
-    const kmContract = new ethers.Contract(owner, ABIS.LSP6, provider);
-    const target = await kmContract.target();
+    // First, try to get Key Manager via LSP6 data key (standard method)
+    const lengthData = await up.getData(DATA_KEYS['AddressPermissions[]']).catch(() => '0x');
     
-    if (target.toLowerCase() === upAddress.toLowerCase()) {
-      return owner;
+    if (lengthData && lengthData !== '0x') {
+      // LSP6 data exists, try to get owner and verify it's a KeyManager
+      const owner = await up.owner();
+      
+      // Check if owner is a Key Manager
+      try {
+        const kmContract = new ethers.Contract(owner, ABIS.LSP6, provider);
+        const target = await kmContract.target();
+        
+        if (target.toLowerCase() === upAddress.toLowerCase()) {
+          return owner;
+        }
+      } catch (err) {
+        // If LSP6 check fails, fall back to owner()
+        return owner;
+      }
     }
     
-    return null;
+    // Fallback: use owner() directly when LSP6 data key is empty
+    const owner = await up.owner();
+    return owner;
   } catch (err) {
     return null;
   }
@@ -266,7 +280,12 @@ export async function getProfileInfo(upAddress, provider) {
   }
   
   // Get Key Manager if owner is one
-  const keyManager = await getKeyManager(upAddress, provider);
+  const lsp6Key = '0x4b80742de2bf485b1436b50a565f0e1b0c1b05b8b55c16cc7a6c2c1e0c1f0b0d';
+let kmAddress = await up.getData(lsp6Key);
+if (!kmAddress || kmAddress === '0x0000000000000000000000000000000000000000') {
+  kmAddress = await up.owner();
+}
+const keyManager = kmAddress || null;
   
   // Get controllers count
   let controllersCount = 0;
@@ -353,26 +372,34 @@ export async function listControllers(upAddress, provider) {
   }
   
   const count = parseInt(lengthData, 16);
-  const controllers = [];
   
-  // Build keys for all controller addresses
-  const indexKeys = [];
-  for (let i = 0; i < count; i++) {
-    const indexKey = DATA_KEYS['AddressPermissions[]'] + 
-      i.toString(16).padStart(32, '0');
-    indexKeys.push(indexKey);
+  if (count === 0 || count > 100) { // Sanity check
+    return [];
   }
   
-  // Get all addresses
-  const addresses = await up.getDataBatch(indexKeys);
+  const controllers = [];
   
-  // Get permissions for each
-  for (let i = 0; i < addresses.length; i++) {
-    if (addresses[i] && addresses[i] !== '0x') {
-      // Extract address from bytes (might be padded)
-      const addr = '0x' + addresses[i].slice(-40);
-      const info = await getControllerPermissions(upAddress, addr, provider);
-      controllers.push(info);
+  // Get each controller address using individual getData calls
+  // LSP2 Array: element key = baseKey (16 bytes) + index (16 bytes)
+  const baseKey16 = DATA_KEYS['AddressPermissions[]'].slice(0, 34); // 0x + 32 chars = 16 bytes
+  
+  for (let i = 0; i < count; i++) {
+    try {
+      // Build index key: 16-byte base + 16-byte index
+      const index16 = ethers.zeroPadValue(ethers.toBeArray(i), 16).slice(2); // 32 hex chars
+      const elementKey = baseKey16 + index16;
+      
+      const addrData = await up.getData(elementKey);
+      
+      if (addrData && addrData !== '0x') {
+        // Extract address from bytes32 (last 20 bytes)
+        const addr = '0x' + addrData.slice(-40);
+        const info = await getControllerPermissions(upAddress, addr, provider);
+        controllers.push(info);
+      }
+    } catch (err) {
+      // Skip this entry and continue
+      console.error(`Error fetching controller ${i}:`, err.message);
     }
   }
   

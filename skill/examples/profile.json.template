@@ -1,0 +1,53 @@
+{
+  "LSP3Profile": {
+    "name": "Your Name",
+    "description": "Your profile description",
+    "links": [
+      {
+        "title": "Twitter",
+        "url": "https://twitter.com/yourhandle"
+      }
+    ],
+    "tags": [
+      "Your",
+      "Tags",
+      "Here"
+    ],
+    "profileImage": [
+      {
+        "width": 1024,
+        "height": 1024,
+        "hashFunction": "keccak256(bytes)",
+        "hash": "0x...",
+        "url": "ipfs://QmYourImageCIDHere"
+      }
+    ],
+    "backgroundImage": [
+      {
+        "width": 1920,
+        "height": 1080,
+        "hashFunction": "keccak256(bytes)",
+        "hash": "0x...",
+        "url": "ipfs://QmYourBackgroundCIDHere"
+      }
+    ],
+    "images": [
+      {
+        "width": 1024,
+        "height": 1024,
+        "hashFunction": "keccak256(bytes)",
+        "hash": "0x...",
+        "url": "ipfs://QmYourImageCIDHere"
+      }
+    ],
+    "categories": ["Art", "Culture"],
+    "visibility": "public",
+    "collectionType": 1,
+    "status": "active",
+    "timestamps": {
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    },
+    "ownerUP": "0xYourUniversalProfileAddress"
+  }
+}

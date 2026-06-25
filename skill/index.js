@@ -545,6 +545,9 @@ Commands:
   
   profile info [<address>] [--chain]       Get profile information
   profile configure <address> [--chain]    Configure a profile for use
+  profile update --up <addr> --key <key> --json <file>  Update LSP3 profile metadata
+  
+  grid update --up <addr> --key <key> --json <file>     Update LSP28 TheGrid metadata
   
   permissions encode <perm1> [perm2...]    Encode permissions to hex
   permissions decode <hex>                 Decode permissions from hex
@@ -571,7 +574,93 @@ Examples:
   up permissions encode CALL TRANSFERVALUE
   up permissions validate 0x0000...0801
   up authorize url --permissions token-operator
+  up profile update --up 0x1234... --key 0xabc... --json profile.json
+  up grid update --up 0x1234... --key 0xabc... --json grid.json
 `);
+  },
+
+  /**
+   * up profile update - Update LSP3 profile metadata
+   */
+  'profile:update': async (args) => {
+    const { options } = args;
+    
+    if (!options.up || !options.key || !options.json) {
+      console.log('Usage: up profile update --up <address> --key <private-key> --json <file.json> [--network <network>]');
+      console.log('');
+      console.log('Environment variables:');
+      console.log('  PINATA_API_KEY   Your Pinata API key');
+      console.log('  PINATA_SECRET    Your Pinata secret');
+      return null;
+    }
+    
+    // Import and run the profile update script directly
+    const { spawn } = await import('child_process');
+    const network = options.network || 'mainnet';
+    
+    return new Promise((resolve, reject) => {
+      const scriptPath = new URL('./commands/update-profile.js', import.meta.url).pathname;
+      const child = spawn('node', [
+        scriptPath,
+        '--up', options.up,
+        '--key', options.key,
+        '--json', options.json,
+        '--network', network
+      ], {
+        stdio: 'inherit',
+        env: { ...process.env, PINATA_API_KEY: process.env.PINATA_API_KEY, PINATA_SECRET: process.env.PINATA_SECRET }
+      });
+      
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve({ success: true, network });
+        } else {
+          reject(new Error(`Profile update failed with code ${code}`));
+        }
+      });
+    });
+  },
+
+  /**
+   * up grid update - Update LSP28 TheGrid metadata
+   */
+  'grid:update': async (args) => {
+    const { options } = args;
+    
+    if (!options.up || !options.key || !options.json) {
+      console.log('Usage: up grid update --up <address> --key <private-key> --json <file.json> [--network <network>]');
+      console.log('');
+      console.log('Environment variables:');
+      console.log('  PINATA_API_KEY   Your Pinata API key');
+      console.log('  PINATA_SECRET    Your Pinata secret');
+      return null;
+    }
+    
+    // Import and run the grid update script directly
+    const { spawn } = await import('child_process');
+    const network = options.network || 'mainnet';
+    
+    return new Promise((resolve, reject) => {
+      const scriptPath = new URL('./commands/update-grid.js', import.meta.url).pathname;
+      const child = spawn('node', [
+        scriptPath,
+        '--up', options.up,
+        '--key', options.key,
+        '--json', options.json,
+        '--network', network
+      ], {
+        stdio: 'inherit',
+        env: { ...process.env, PINATA_API_KEY: process.env.PINATA_API_KEY, PINATA_SECRET: process.env.PINATA_SECRET }
+      });
+      
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve({ success: true, network });
+        } else {
+          reject(new Error(`Grid update failed with code ${code}`));
+        }
+      });
+    });
   },
 };
 
